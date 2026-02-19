@@ -1,0 +1,113 @@
+{
+	"name": "home-inventory-backend",
+	"version": "1.0.0",
+	"description": "Home inventory app backend part",
+	"homepage": "https://github.com/afk-hun/home-inventory-backend#readme",
+	"bugs": {
+		"url": "https://github.com/afk-hun/home-inventory-backend/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/afk-hun/home-inventory-backend.git"
+	},
+	"license": "ISC",
+	"author": "Akos Ferenc Kalamar",
+	"type": "commonjs",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"devDependencies": {
+		"@semantic-release/changelog": "^6.0.3",
+		"@semantic-release/commit-analyzer": "^13.0.1",
+		"@semantic-release/git": "^10.0.1",
+		"@semantic-release/github": "^11.0.6",
+		"@semantic-release/release-notes-generator": "^14.1.0",
+		"semantic-release": "^25.0.3"
+	},
+	"release": {
+		"branches": [
+			"main"
+		],
+		"plugins": [
+			[
+				"@semantic-release/commit-analyzer",
+				{
+					"releaseRules": [
+						{
+							"breaking": true,
+							"release": "major"
+						},
+						{
+							"type": "feat",
+							"release": "minor"
+						},
+						{
+							"type": "fix",
+							"release": "patch"
+						},
+						{
+							"type": "perf",
+							"release": false
+						},
+						{
+							"type": "revert",
+							"release": false
+						},
+						{
+							"type": "docs",
+							"release": false
+						},
+						{
+							"type": "style",
+							"release": false
+						},
+						{
+							"type": "refactor",
+							"release": false
+						},
+						{
+							"type": "test",
+							"release": false
+						},
+						{
+							"type": "build",
+							"release": false
+						},
+						{
+							"type": "ci",
+							"release": false
+						},
+						{
+							"type": "chore",
+							"release": false
+						}
+					]
+				}
+			],
+			"@semantic-release/release-notes-generator",
+			"@semantic-release/changelog",
+			[
+				"@semantic-release/github",
+				{
+					"assets": [
+						{
+							"path": "dist.zip",
+							"label": "Distribution"
+						}
+					]
+				}
+			],
+			[
+				"@semantic-release/git",
+				{
+					"assets": [
+						"package.json",
+						"CHANGELOG.md"
+					],
+					"message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+				}
+			]
+		]
+	}
+}
