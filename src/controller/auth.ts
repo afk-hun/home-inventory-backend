@@ -17,7 +17,7 @@ class CustomError extends Error {
 export const signup = (req: Request, res: Response, next: NextFunction) => {
 	const errors = validationResult(req);
 	if (!errors.isEmpty()) {
-		const error = new CustomError("Validation failed.");
+		const error = new CustomError(errors.array().map(err => err.msg).join(", ") || "Validation failed");
 		error.statusCode = 422;
 		error.data = errors.array();
 		return next(error);
@@ -42,6 +42,7 @@ export const signup = (req: Request, res: Response, next: NextFunction) => {
 				message: "User created!",
 				userId: result._id,
 			});
+			res.end();
 		})
 		.catch((err) => {
 			if (!err.statusCode) {
