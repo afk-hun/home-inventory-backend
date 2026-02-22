@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { body } from "express-validator";
 import User from "../models/user";
-import { signup } from "../controller/auth";
+import { signup, login } from "../controller/auth";
 
 const router = Router();
 
@@ -24,5 +24,7 @@ router.post(
 	],
 	signup,
 );
+
+router.post("/login", login);
 
 export default router;
