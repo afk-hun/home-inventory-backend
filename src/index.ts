@@ -13,8 +13,11 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 app.use(bodyParser.json());
 
+const allowedOrigin =
+	process.env.CORS_ORIGIN || process.env.FRONTEND_URL || "http://localhost:5173";
+
 app.use((req, res, next) => {
-	res.setHeader("Access-Control-Allow-Origin", "*");
+	res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
 	res.setHeader(
 		"Access-Control-Allow-Methods",
 		"OPTIONS, GET, POST, PUT, PATCH, DELETE",
@@ -23,6 +26,12 @@ app.use((req, res, next) => {
 		"Access-Control-Allow-Headers",
 		"Content-Type, Authorization",
 	);
+	res.setHeader("Access-Control-Allow-Credentials", "true");
+
+	if (req.method === "OPTIONS") {
+		return res.sendStatus(200);
+	}
+
 	next();
 });
 
