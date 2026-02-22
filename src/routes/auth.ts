@@ -5,7 +5,7 @@ import { signup } from "../controller/auth";
 
 const router = Router();
 
-router.put(
+router.post(
 	"/signup",
 	[
 		body("email")
