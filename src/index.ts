@@ -1,7 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import authRoutes  from "./routes/auth";
+import authRoutes from "./routes/auth";
 import bodyParser from "body-parser";
 
 dotenv.config();
@@ -9,9 +9,9 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
-const MONGODB_URI = `${process.env.MONGODB_TYPE}://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@${process.env.MONGODB_SERVER_DOMAIN}:${process.env.MONGODB_PORT}/home-inventory?authSource=admin`;
+const MONGODB_URI = process.env.MONGODB_URI;
 
-app.use(bodyParser.json()); 
+app.use(bodyParser.json());
 
 app.use((req, res, next) => {
 	res.setHeader("Access-Control-Allow-Origin", "*");
@@ -32,18 +32,46 @@ app.get("/health", (_req, res) => {
 	res.json({ status: "ok" });
 });
 
-app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-	const status = error.statusCode || 500;
-	const message = error.message || "Internal server error";
-	const data = error.data;
+app.use(
+	(
+		error: any,
+		_req: express.Request,
+		res: express.Response,
+		_next: express.NextFunction,
+	) => {
+		const status =
+			typeof error?.statusCode === "number" ? error.statusCode : 500;
+		const isHandledClientError = status >= 400 && status < 500;
+		const isProduction = process.env.NODE_ENV === "production";
 
-	res.status(status).json({
-		message,
-		data,
-	});
-});
+		const responseBody: {
+			message: string;
+			data?: unknown;
+			debugMessage?: string;
+		} = {
+			message: isHandledClientError
+				? error?.message || "Request failed"
+				: "Internal server error",
+		};
 
-if (!MONGODB_URI.includes("undefined")) {
+		if (isHandledClientError && error?.data !== undefined) {
+			responseBody.data = error.data;
+		}
+
+		if (!isProduction && !isHandledClientError && error?.message) {
+			responseBody.debugMessage = error.message;
+		}
+
+		res.status(status).json(responseBody);
+	},
+);
+
+if (!MONGODB_URI || typeof MONGODB_URI !== "string") {
+	console.error(
+		"MongoDB connection string is invalid. Check MONGO_URI or MONGODB_* environment variables.",
+	);
+} else {
+	console.log("Connecting to MongoDB...", MONGODB_URI);
 	mongoose
 		.connect(MONGODB_URI)
 		.then(() => {
@@ -53,8 +81,4 @@ if (!MONGODB_URI.includes("undefined")) {
 		.catch((err) => {
 			console.log(err);
 		});
-} else {
-	console.error(
-		"MongoDB connection string is invalid. Check MONGO_URI or MONGODB_* environment variables.",
-	);
-}
+} 

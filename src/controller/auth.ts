@@ -42,7 +42,6 @@ export const signup = (req: Request, res: Response, next: NextFunction) => {
 				message: "User created!",
 				userId: result._id,
 			});
-			res.end();
 		})
 		.catch((err) => {
 			if (!err.statusCode) {
