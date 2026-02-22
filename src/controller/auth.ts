@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
-import User from "../models/user";
+import User, { IUser } from "../models/user";
 import jwt from "jsonwebtoken";
 
 class CustomError extends Error {
@@ -58,10 +58,23 @@ export const signup = (req: Request, res: Response, next: NextFunction) => {
 };
 
 export const login = (req: Request, res: Response, next: NextFunction) => {
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) {
+		const error = new CustomError(
+			errors
+				.array()
+				.map((err) => err.msg)
+				.join(", ") || "Validation failed",
+		);
+		error.statusCode = 422;
+		error.data = errors.array();
+		return next(error);
+	}
+
 	const email = req.body.email;
 	const password = req.body.password;
 
-	let loadedUser: any;
+	let loadedUser: IUser;
 	User.findOne({ email: email })
 		.then((user) => {
 			if (!user) {
@@ -76,7 +89,7 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 		})
 		.then((isEqual) => {
 			if (!isEqual) {
-				const error = new CustomError("Wrong password!");
+				const error = new CustomError("Email or password is incorrect.");
 				error.statusCode = 401;
 				throw error;
 			}

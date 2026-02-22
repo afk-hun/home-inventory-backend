@@ -25,6 +25,20 @@ router.post(
 	signup,
 );
 
-router.post("/login", login);
+router.post(
+	"/login",
+	[
+		body("email")
+			.isEmail()
+			.withMessage("Please enter a valid email.")
+			.normalizeEmail(),
+		body("password")
+			.exists()
+			.withMessage("Password is required.")
+			.bail()
+			.isLength({ min: 1 }),
+	],
+	login,
+);
 
 export default router;
