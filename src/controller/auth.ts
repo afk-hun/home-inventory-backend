@@ -106,8 +106,14 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 				process.env.JWT_SECRET,
 				{ expiresIn: "1h" },
 			);
+			res.cookie("auth_token", token, {
+				httpOnly: true,
+				secure: process.env.NODE_ENV === "production",
+				sameSite: "lax",
+				maxAge: 60 * 60 * 1000,
+				path: "/",
+			});
 			res.status(200).json({
-				token: token,
 				userId: loadedUser._id.toString(),
 			});
 		})
@@ -117,4 +123,15 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 			}
 			next(err);
 		});
+};
+
+export const logout = (_req: Request, res: Response) => {
+	res.clearCookie("auth_token", {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === "production",
+		sameSite: "lax",
+		path: "/",
+	});
+
+	res.status(200).json({ message: "Logged out successfully." });
 };
