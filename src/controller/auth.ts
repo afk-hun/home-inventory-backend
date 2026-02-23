@@ -3,6 +3,7 @@ import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
 import User, { IUser } from "../models/user";
 import jwt from "jsonwebtoken";
+import { randomBytes } from "crypto";
 
 class CustomError extends Error {
 	statusCode: number;
@@ -14,6 +15,24 @@ class CustomError extends Error {
 		this.data = null;
 	}
 }
+
+const CSRF_COOKIE_NAME = "XSRF-TOKEN";
+
+const setCsrfCookie = (res: Response, token: string) => {
+	res.cookie(CSRF_COOKIE_NAME, token, {
+		httpOnly: false,
+		secure: process.env.NODE_ENV === "production",
+		sameSite: "lax",
+		maxAge: 2 * 60 * 60 * 1000,
+		path: "/",
+	});
+};
+
+export const csrfToken = (_req: Request, res: Response) => {
+	const token = randomBytes(32).toString("hex");
+	setCsrfCookie(res, token);
+	res.status(200).json({ csrfToken: token });
+};
 
 export const signup = (req: Request, res: Response, next: NextFunction) => {
 	const errors = validationResult(req);

@@ -1,12 +1,16 @@
 import { Router } from "express";
 import { body } from "express-validator";
 import User from "../models/user";
-import { signup, login, logout } from "../controller/auth";
+import { signup, login, logout, csrfToken } from "../controller/auth";
+import { validateCsrf } from "../middleware/csrf";
 
 const router = Router();
 
+router.get("/csrf-token", csrfToken);
+
 router.post(
 	"/signup",
+	validateCsrf,
 	[
 		body("email")
 			.isEmail()
@@ -27,6 +31,7 @@ router.post(
 
 router.post(
 	"/login",
+	validateCsrf,
 	[
 		body("email")
 			.isEmail()
@@ -41,6 +46,6 @@ router.post(
 	login,
 );
 
-router.post("/logout", logout);
+router.post("/logout", validateCsrf, logout);
 
 export default router;
