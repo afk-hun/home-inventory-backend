@@ -3,6 +3,7 @@ import { body } from "express-validator";
 import User from "../models/user";
 import { signup, login, logout, csrfToken } from "../controller/auth";
 import { validateCsrf } from "../middleware/csrf";
+import { loginLimiter, signupLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
@@ -10,6 +11,7 @@ router.get("/csrf-token", csrfToken);
 
 router.post(
 	"/signup",
+	signupLimiter,
 	validateCsrf,
 	[
 		body("email")
@@ -31,6 +33,7 @@ router.post(
 
 router.post(
 	"/login",
+	loginLimiter,
 	validateCsrf,
 	[
 		body("email")
@@ -41,7 +44,7 @@ router.post(
 			.exists()
 			.withMessage("Password is required.")
 			.bail()
-			.isLength({ min: 1 }),
+			.isLength({ min: 6 }),
 	],
 	login,
 );

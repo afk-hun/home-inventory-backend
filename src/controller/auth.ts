@@ -98,7 +98,7 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 		.then((user) => {
 			if (!user) {
 				const error = new CustomError(
-					"A user with this email could not be found.",
+					"Email or password is incorrect.",
 				);
 				error.statusCode = 401;
 				throw error;
@@ -112,17 +112,12 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 				error.statusCode = 401;
 				throw error;
 			}
-			if (process.env.JWT_SECRET === undefined) {
-				const error = new CustomError("JWT secret is not configured.");
-				error.statusCode = 500;
-				return next(error);
-			}
 			const token = jwt.sign(
 				{
 					email: loadedUser.email,
 					userId: loadedUser._id.toString(),
 				},
-				process.env.JWT_SECRET,
+				process.env.JWT_SECRET!,
 				{ expiresIn: "1h" },
 			);
 			res.cookie("auth_token", token, {
