@@ -14,9 +14,18 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 app.use(bodyParser.json());
 
-const allowedOrigin =
+const rawCorsOrigin =
 	process.env.CORS_ORIGIN || process.env.FRONTEND_URL || "http://localhost:5173";
-
+const isProductionEnv = process.env.NODE_ENV === "production";
+const isWildcardOrigin =
+	rawCorsOrigin === "*" || rawCorsOrigin.includes("*");
+if (isProductionEnv && isWildcardOrigin) {
+	throw new Error(
+		"Invalid CORS configuration: wildcard origins are not allowed in production when credentials are enabled. " +
+			"Please set CORS_ORIGIN or FRONTEND_URL to the exact frontend URL.",
+	);
+}
+const allowedOrigin = rawCorsOrigin;
 app.use((req, res, next) => {
 	res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
 	res.setHeader(
