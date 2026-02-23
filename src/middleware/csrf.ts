@@ -1,39 +1,39 @@
 import { NextFunction, Request, Response } from "express";
+import { CSRF_HEADER_NAME, CSRF_SESSION_COOKIE_NAME } from "../constants/csrf";
+import {
+	createCsrfToken,
+	isCsrfTokenValid,
+} from "../lib/csrf";
 
-const CSRF_COOKIE_NAME = "XSRF-TOKEN";
-const CSRF_HEADER_NAME = "x-csrf-token";
-
-const parseCookieHeader = (cookieHeader?: string): Record<string, string> => {
-	if (!cookieHeader) {
-		return {};
-	}
-
-	return cookieHeader
-		.split(";")
-		.map((part) => part.trim())
-		.filter(Boolean)
-		.reduce<Record<string, string>>((cookies, cookiePart) => {
-			const [rawName, ...rawValue] = cookiePart.split("=");
-			if (!rawName || rawValue.length === 0) {
-				return cookies;
-			}
-
-			cookies[rawName] = decodeURIComponent(rawValue.join("="));
-			return cookies;
-		}, {});
-};
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export const validateCsrf = (
 	req: Request,
 	res: Response,
 	next: NextFunction,
 ) => {
-	const cookies = parseCookieHeader(req.headers.cookie);
-	const csrfCookie = cookies[CSRF_COOKIE_NAME];
-	const csrfHeader = req.headers[CSRF_HEADER_NAME];
-	const csrfToken = Array.isArray(csrfHeader) ? csrfHeader[0] : csrfHeader;
+	if (SAFE_METHODS.has(req.method)) {
+		next();
+		return;
+	}
 
-	if (!csrfCookie || !csrfToken || csrfCookie !== csrfToken) {
+	const csrfSessionId = req.cookies?.[CSRF_SESSION_COOKIE_NAME];
+	const csrfHeader = req.headers[CSRF_HEADER_NAME];
+	const providedCsrfToken =
+		Array.isArray(csrfHeader) ? csrfHeader[0] : csrfHeader;
+
+	if (!csrfSessionId || !providedCsrfToken) {
+		return res.status(403).json({
+			message: "Invalid CSRF token.",
+		});
+	}
+
+	const expectedCsrfToken = createCsrfToken(
+		csrfSessionId,
+		process.env.JWT_SECRET!,
+	);
+
+	if (!isCsrfTokenValid(expectedCsrfToken, providedCsrfToken)) {
 		return res.status(403).json({
 			message: "Invalid CSRF token.",
 		});

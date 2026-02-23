@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth";
 import bodyParser from "body-parser";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
@@ -12,31 +13,75 @@ const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
 
+const rawTrustProxy = process.env.TRUST_PROXY;
+const trustProxyValue =
+	rawTrustProxy === undefined
+		? false
+		: rawTrustProxy === "true"
+			? true
+			: rawTrustProxy === "false"
+				? false
+				: /^\d+$/.test(rawTrustProxy)
+					? Number(rawTrustProxy)
+					: rawTrustProxy;
+
+app.set("trust proxy", trustProxyValue);
+
 app.use(bodyParser.json());
+app.use(cookieParser());
 
 const rawCorsOrigin =
 	process.env.CORS_ORIGIN || process.env.FRONTEND_URL || "http://localhost:5173";
+const allowedOrigins = rawCorsOrigin
+	.split(",")
+	.map((origin) => origin.trim())
+	.filter(Boolean);
 const isProductionEnv = process.env.NODE_ENV === "production";
-const isWildcardOrigin =
-	rawCorsOrigin === "*" || rawCorsOrigin.includes("*");
+const isWildcardOrigin = allowedOrigins.some(
+	(origin) => origin === "*" || origin.includes("*"),
+);
 if (isProductionEnv && isWildcardOrigin) {
 	throw new Error(
 		"Invalid CORS configuration: wildcard origins are not allowed in production when credentials are enabled. " +
 			"Please set CORS_ORIGIN or FRONTEND_URL to the exact frontend URL.",
 	);
 }
-const allowedOrigin = rawCorsOrigin;
+if (allowedOrigins.length === 0) {
+	throw new Error(
+		"Invalid CORS configuration: no allowed origin was configured.",
+	);
+}
+
 app.use((req, res, next) => {
-	res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-	res.setHeader(
-		"Access-Control-Allow-Methods",
-		"OPTIONS, GET, POST, PUT, PATCH, DELETE",
-	);
-	res.setHeader(
-		"Access-Control-Allow-Headers",
-		"Content-Type, Authorization, X-CSRF-Token",
-	);
-	res.setHeader("Access-Control-Allow-Credentials", "true");
+	const requestOrigin = req.headers.origin;
+	const hasRequestOrigin =
+		typeof requestOrigin === "string" && requestOrigin.trim().length > 0;
+	const isOriginAllowed =
+		hasRequestOrigin && allowedOrigins.includes(requestOrigin);
+
+	if (hasRequestOrigin && !isOriginAllowed) {
+		if (req.method === "OPTIONS") {
+			return res.sendStatus(403);
+		}
+
+		return res.status(403).json({
+			message: "Origin not allowed by CORS policy.",
+		});
+	}
+
+	if (isOriginAllowed) {
+		res.setHeader("Vary", "Origin");
+		res.setHeader("Access-Control-Allow-Origin", requestOrigin);
+		res.setHeader(
+			"Access-Control-Allow-Methods",
+			"OPTIONS, GET, POST, PUT, PATCH, DELETE",
+		);
+		res.setHeader(
+			"Access-Control-Allow-Headers",
+			"Content-Type, Authorization, X-CSRF-Token",
+		);
+		res.setHeader("Access-Control-Allow-Credentials", "true");
+	}
 
 	if (req.method === "OPTIONS") {
 		return res.sendStatus(200);
@@ -99,7 +144,6 @@ if (!JWT_SECRET || typeof JWT_SECRET !== "string") {
 	process.exit(1);
 }
 
-console.log("Connecting to MongoDB...", MONGODB_URI);
 mongoose
 	.connect(MONGODB_URI)
 	.then(() => {
@@ -109,4 +153,4 @@ mongoose
 	.catch((err) => {
 		console.error("MongoDB connection error:", err);
 		process.exit(1);
-	}); 
+	});

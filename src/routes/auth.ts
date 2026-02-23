@@ -44,7 +44,8 @@ router.post(
 			.exists()
 			.withMessage("Password is required.")
 			.bail()
-			.isLength({ min: 6 }),
+			.isLength({ min: 6 })
+			.withMessage("Password must be at least 6 characters long."), 
 	],
 	login,
 );
