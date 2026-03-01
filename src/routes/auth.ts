@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { body } from "express-validator";
 import User from "../models/user";
-import { signup, login, logout, csrfToken } from "../controller/auth";
+import { signup, login, logout } from "../controller/auth";
 import { validateCsrf } from "../middleware/csrf";
 import { loginLimiter, signupLimiter } from "../middleware/rateLimiter";
+import { csrfToken } from "../controller/csrf";
 
 const router = Router();
 
