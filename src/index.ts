@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth";
-import householdRoutes from "./routes/houshold";
+import householdRoutes from "./routes/household";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 

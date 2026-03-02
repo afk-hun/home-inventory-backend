@@ -1,11 +1,11 @@
 import mongoose, { Types, Document } from "mongoose";
-import user from "./user";
+import { IUser } from "./user";
 
 export interface IHousehold extends Document {
 	_id: Types.ObjectId;
 	name: string;
-	owner: string;
-	users: string[];
+	owner: Omit<IUser, "password">;
+	members: Omit<IUser, "password">[];
 }
 const Schema = mongoose.Schema;
 
@@ -15,41 +15,43 @@ const householdSchema = new Schema<IHousehold>({
 		required: true,
 	},
 	owner: {
-		type: String,
+		type: Object,
 		required: true,
 	},
-	users: {
-		type: [String],
+	members: {
+		type: [Object],
 		required: true,
 	},
 });
 
-householdSchema.methods.setName = function (name: string) {
-	this.name = name;
-	return this.save();
-}
 
-householdSchema.methods.setOwner = function (owner: string) {
-	this.owner = owner;
-	return this.save();
-}
+// TODO check how to use these
+// householdSchema.methods.setName = function (name: string) {
+// 	this.name = name;
+// 	return this.save();
+// }
 
-householdSchema.methods.addUserToHousehold = function (name: string) {
-	this.users.push(name);
-	return this.save();
-}
+// householdSchema.methods.setOwner = function (owner: string) {
+// 	this.owner = owner;
+// 	return this.save();
+// }
 
-householdSchema.methods.removeUserFromHousehold = function (name: string) {
-	this.users = this.users.filter((user: string) => user !== name);
-	return this.save();
-}
+// householdSchema.methods.addUserToHousehold = function (userId: string) {
+// 	this.members.push({ name });
+// 	return this.save();
+// }
 
-householdSchema.methods.isUserInHousehold = function (name: string) {
-	return this.users.includes(name);
-}
+// householdSchema.methods.removeUserFromHousehold = function (name: string) {
+// 	this.members = this.members.filter((user: IUser) => user.name !== name);
+// 	return this.save();
+// }
 
-householdSchema.methods.getHouseholdUsers = function () {
-	return user.find({ name: { $in: this.users } });
-}
+// householdSchema.methods.isUserInHousehold = function (name: string) {
+// 	return this.members.some((user: IUser) => user.name === name);
+// }
+
+// householdSchema.methods.getHouseholdUsers = function () {
+// 	return user.find({ name: { $in: this.members.map((member: IUser) => member.name) } });
+// }
 
 export default mongoose.model<IHousehold>("Household", householdSchema);

@@ -1,8 +1,40 @@
 import { NextFunction, Request, Response } from "express";
 
-import Household from "../models/household";
+import Household, { IHousehold } from "../models/household";
+import User, { IUser } from "../models/user";
 
-export const createHousehold = (
+export const getHouseholds = (
+	req: Request,
+	res: Response,
+	next: NextFunction,
+) => {
+	const userId = req.body.userId;
+
+	if (!userId) {
+		const error = new Error("User ID is required") as any;
+		error.statusCode = 400;
+		return next(error);
+	}
+
+	Household.find({ owner: userId })
+		.then((households) => {
+			res.status(200).json({
+				households: households.map((household) => ({
+					id: household._id,
+					name: household.name,
+					members: household.members,
+				})),
+			});
+		})
+		.catch((err) => {
+			if (!err.statusCode) {
+				err.statusCode = 500;
+			}
+			next(err);
+		});
+};
+
+export const createHousehold = async (
 	req: Request,
 	res: Response,
 	next: NextFunction,
@@ -10,10 +42,32 @@ export const createHousehold = (
 	const name = req.body.name;
 	const owner = req.body.owner;
 
+	if (!name || !owner) {
+		const error = new Error("Name and owner are required") as any;
+		error.statusCode = 400;
+		return next(error);
+	}
+
+	const ownerData = User.findById(owner).select("-password").exec()
+		.then((user) => {
+			if (!user) {
+				const error = new Error("User not found") as any;
+				error.statusCode = 404;
+				throw error;
+			}
+			return user;
+		})
+		.catch((err) => {
+			if (!err.statusCode) {
+				err.statusCode = 500;
+			}
+			next(err);
+		});
+
 	const household = new Household({
 		name,
-		owner,
-		users: [owner],
+		owner: await ownerData,
+		members: [await ownerData],
 	});
 
 	household
@@ -40,7 +94,11 @@ export const renameHousehold = (
 	const householdId = req.body.householdId;
 	const newName = req.body.name;
 
-	console.log(`Renaming household ${householdId} to ${newName}`);
+	if (!householdId || !newName) {
+		const error = new Error("Household ID and new name are required") as any;
+		error.statusCode = 400;
+		return next(error);
+	}
 
 	Household.findById(householdId)
 		.then((household) => {
@@ -72,6 +130,11 @@ export const deleteHousehold = (
 	next: NextFunction,
 ) => {
 	const householdId = req.body.householdId;
+	if (!householdId) {
+		const error = new Error("Household ID is required") as any;
+		error.statusCode = 400;
+		return next(error);
+	}
 
 	Household.findByIdAndDelete(householdId)
 		.then((result) => {
@@ -89,5 +152,5 @@ export const deleteHousehold = (
 				err.statusCode = 500;
 			}
 			next(err);
-		});	
-	};
+		});
+};
