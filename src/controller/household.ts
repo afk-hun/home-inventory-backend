@@ -1,26 +1,26 @@
 import { NextFunction, Request, Response } from "express";
 
-import Household, { IHousehold } from "../models/household";
-import User, { IUser } from "../models/user";
+import Household from "../models/household";
 
 export const getHouseholds = (
 	req: Request,
 	res: Response,
 	next: NextFunction,
 ) => {
-	const userId = req.body.userId;
+	const user = req.user;
+	
 
-	if (!userId) {
-		const error = new Error("User ID is required") as any;
-		error.statusCode = 400;
+	if (!user) {
+		const error = new Error("User not found") as any;
+		error.statusCode = 404;
 		return next(error);
 	}
 
-	Household.find({ owner: userId })
+	Household.find({ "owner._id": user._id })
 		.then((households) => {
 			res.status(200).json({
 				households: households.map((household) => ({
-					id: household._id,
+					_id: household._id,
 					name: household.name,
 					members: household.members,
 				})),
@@ -40,7 +40,7 @@ export const createHousehold = async (
 	next: NextFunction,
 ) => {
 	const name = req.body.name;
-	const owner = req.body.owner;
+	const owner = req.user;
 
 	if (!name || !owner) {
 		const error = new Error("Name and owner are required") as any;
@@ -48,26 +48,10 @@ export const createHousehold = async (
 		return next(error);
 	}
 
-	const ownerData = User.findById(owner).select("-password").exec()
-		.then((user) => {
-			if (!user) {
-				const error = new Error("User not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return user;
-		})
-		.catch((err) => {
-			if (!err.statusCode) {
-				err.statusCode = 500;
-			}
-			next(err);
-		});
-
 	const household = new Household({
 		name,
-		owner: await ownerData,
-		members: [await ownerData],
+		owner: owner,
+		members: [owner],
 	});
 
 	household
@@ -75,7 +59,7 @@ export const createHousehold = async (
 		.then((result) => {
 			res.status(201).json({
 				message: "Household created!",
-				householdId: result._id,
+				household: household,
 			});
 		})
 		.catch((err) => {
@@ -130,6 +114,7 @@ export const deleteHousehold = (
 	next: NextFunction,
 ) => {
 	const householdId = req.body.householdId;
+
 	if (!householdId) {
 		const error = new Error("Household ID is required") as any;
 		error.statusCode = 400;
