@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { body } from "express-validator";
 import User from "../models/user";
-import { signup, login, logout } from "../controller/auth";
+import { signup, login, logout, refreshToken } from "../controller/auth";
 import { validateCsrf } from "../middleware/csrf";
 import { loginLimiter, signupLimiter } from "../middleware/rateLimiter";
 import { csrfToken } from "../controller/csrf";
@@ -50,6 +50,8 @@ router.post(
 	],
 	login,
 );
+
+router.post("/refresh", refreshToken);
 
 router.post("/logout", validateCsrf, logout);
 
