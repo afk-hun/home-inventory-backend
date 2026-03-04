@@ -20,12 +20,17 @@ export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 		return res.status(401).json({ message: "Unauthorized" });
 	}
 
+	if (decodedToken.type !== "access") {
+		return res.status(401).json({ message: "Unauthorized" });
+	}
+	
 	const userId = decodedToken.userId;
 	if (!userId || typeof userId !== "string") {
 		return res.status(401).json({ message: "Unauthorized" });
 	}
 
 	User.findById(userId)
+		.select("-password")
 		.then((user) => {
 			if (!user) {
 				return res.status(401).json({ message: "Unauthorized" });

@@ -51,7 +51,7 @@ router.post(
 	login,
 );
 
-router.post("/refresh", refreshToken);
+router.post("/refresh", loginLimiter, validateCsrf, refreshToken);  
 
 router.post("/logout", validateCsrf, logout);
 

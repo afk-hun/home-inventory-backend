@@ -5,7 +5,7 @@ export {};
 declare global {
 	namespace Express {
 		interface Request {
-			user?: IUser;
+			user?: Omit<IUser, "password">;
 		}
 	}
 }

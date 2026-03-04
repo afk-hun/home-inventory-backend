@@ -100,20 +100,13 @@ const clearAuthCookies = (res: Response) => {
 };
 
 const clearCsrfCookies = (res: Response) => {
-	res.clearCookie("csrf_token", {
-		httpOnly: false,
-		secure: process.env.NODE_ENV === "production",
-		sameSite: "lax",
-		path: "/",
-	});
-
 	res.clearCookie("csrf_session", {
 		httpOnly: false,
 		secure: process.env.NODE_ENV === "production",
 		sameSite: "lax",
 		path: "/",
 	});
-	
+
 	res.clearCookie("XSRF-TOKEN", {
 		httpOnly: false,
 		secure: process.env.NODE_ENV === "production",
