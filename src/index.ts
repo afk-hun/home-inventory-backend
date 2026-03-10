@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth";
 import householdRoutes from "./routes/household";
+import shelf from "./routes/shelf";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 
@@ -95,6 +96,7 @@ app.use((req, res, next) => {
 
 app.use("/auth", authRoutes);
 app.use("/household", householdRoutes);
+app.use("/shelf", shelf);
 
 app.get("/health", (_req, res) => {
 	res.json({ status: "ok" });

@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/user";
+import Household from "../models/household";
 
 export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 	const token = req.cookies?.auth_token;
@@ -23,7 +24,7 @@ export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 	if (decodedToken.type !== "access") {
 		return res.status(401).json({ message: "Unauthorized" });
 	}
-	
+
 	const userId = decodedToken.userId;
 	if (!userId || typeof userId !== "string") {
 		return res.status(401).json({ message: "Unauthorized" });
@@ -33,13 +34,22 @@ export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 		.select("-password")
 		.then((user) => {
 			if (!user) {
-				return res.status(401).json({ message: "Unauthorized" });
+				res.status(401).json({ message: "Unauthorized" });
+				return;
 			}
-
 			req.user = user;
+
+			return Household.findOne({ "owner._id": user._id });
+		})
+		.then((household) => {
+			if (household) {
+				req.householdId = household._id.toString();
+			} else {
+				req.householdId = undefined;
+			}
 			next();
 		})
 		.catch(() => {
-			return res.status(401).json({ message: "Unauthorized" });
+			res.status(401).json({ message: "Unauthorized" });
 		});
 };
