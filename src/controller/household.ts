@@ -1,6 +1,26 @@
 import { NextFunction, Request, Response } from "express";
 
 import Household from "../models/household";
+import { setHouseholdCookie } from "./auth";
+
+export const setHousehold = (
+	req: Request,
+	res: Response,
+	next: NextFunction,
+) => {
+	const householdId = req.body.householdId;
+
+	if (!householdId) {
+		const error = new Error("Household ID is required") as any;
+		error.statusCode = 400;
+		return next(error);
+	}
+
+	setHouseholdCookie(res, householdId);
+	res.status(200).json({
+		message: "Household set successfully",
+	});
+};
 
 export const getHouseholds = (
 	req: Request,
@@ -8,7 +28,6 @@ export const getHouseholds = (
 	next: NextFunction,
 ) => {
 	const user = req.user;
-	
 
 	if (!user) {
 		const error = new Error("User not found") as any;
@@ -79,7 +98,9 @@ export const renameHousehold = (
 	const newName = req.body.name;
 
 	if (!householdId || !newName) {
-		const error = new Error("Household ID and new name are required") as any;
+		const error = new Error(
+			"Household ID and new name are required",
+		) as any;
 		error.statusCode = 400;
 		return next(error);
 	}

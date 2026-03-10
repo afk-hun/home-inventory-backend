@@ -4,10 +4,12 @@ import bcrypt from "bcryptjs";
 import User, { IUser } from "../models/user";
 import jwt from "jsonwebtoken";
 import { CSRF_MAX_AGE_MS } from "./csrf";
+import Household from "../models/household";
 
 const ACCESS_TOKEN_COOKIE_NAME = "auth_token";
 const REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
 const USER_ID_COOKIE_NAME = "user_id";
+const HOUSEHOLD_ID_COOKIE_NAME = "household_id";
 const ACCESS_TOKEN_MAX_AGE_MS = 60 * 60 * 1000;
 const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -76,6 +78,15 @@ const setUserCookie = (res: Response, userId: string) => {
 	});
 };
 
+export const setHouseholdCookie = (res: Response, householdId: string) => {
+	res.cookie(HOUSEHOLD_ID_COOKIE_NAME, householdId, {
+		httpOnly: false,
+		secure: process.env.NODE_ENV === "production",
+		sameSite: "lax",
+		maxAge: CSRF_MAX_AGE_MS,
+	});
+};
+
 const clearAuthCookies = (res: Response) => {
 	res.clearCookie(ACCESS_TOKEN_COOKIE_NAME, {
 		httpOnly: true,
@@ -118,14 +129,13 @@ const clearCsrfCookies = (res: Response) => {
 class CustomError extends Error {
 	statusCode: number;
 	data: any;
-	
+
 	constructor(message: string) {
 		super(message);
 		this.statusCode = 500;
 		this.data = null;
 	}
 }
-
 
 export const signup = (req: Request, res: Response, next: NextFunction) => {
 	const errors = validationResult(req);
@@ -201,7 +211,9 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 		})
 		.then((isEqual) => {
 			if (!isEqual) {
-				const error = new CustomError("Email or password is incorrect.");
+				const error = new CustomError(
+					"Email or password is incorrect.",
+				);
 				error.statusCode = 401;
 				throw error;
 			}
@@ -214,6 +226,18 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 			setAccessTokenCookie(res, accessToken);
 			setRefreshTokenCookie(res, refreshToken);
 			setUserCookie(res, loadedUser._id.toString());
+			// res.status(200).json({
+			// 	message: "Logged in successfully.",
+			// });
+			return Household.findOne({ "owner._id": loadedUser._id });
+		})
+		.then((household) => {
+			if (!household) {
+				const error = new CustomError("No household found for user.");
+				error.statusCode = 404;
+				throw error;
+			}
+			setHouseholdCookie(res, household._id.toString());
 			res.status(200).json({
 				message: "Logged in successfully.",
 			});
