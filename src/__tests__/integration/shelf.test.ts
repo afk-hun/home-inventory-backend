@@ -41,11 +41,11 @@ async function loginAsNewUser(email = "shelf-user@test.com") {
 // ---------------------------------------------------------------------------
 
 describe("Shelf Types", () => {
-	describe("GET /shelf/shelf-types", () => {
+	describe("GET /shelf/shelf-type", () => {
 		it("returns 401 when not authenticated", async () => {
 			const csrf = await getCsrf();
 			const res = await agent
-				.get("/shelf/shelf-types")
+				.get("/shelf/shelf-type")
 				.set("x-csrf-token", csrf);
 			expect(res.status).toBe(401);
 		});
@@ -54,19 +54,19 @@ describe("Shelf Types", () => {
 			await loginAsNewUser();
 			const csrf = await getCsrf();
 			const res = await agent
-				.get("/shelf/shelf-types")
+				.get("/shelf/shelf-type")
 				.set("x-csrf-token", csrf);
 			expect(res.status).toBe(200);
 			expect(res.body.shelfTypes).toEqual([]);
 		});
 	});
 
-	describe("POST /shelf/shelf-types", () => {
+	describe("POST /shelf/shelf-type", () => {
 		it("creates a shelf type and returns 201", async () => {
 			await loginAsNewUser("st-create@test.com");
 			const csrf = await getCsrf();
 			const res = await agent
-				.post("/shelf/shelf-types")
+				.post("/shelf/shelf-type")
 				.set("x-csrf-token", csrf)
 				.send({ name: "Fridge" });
 			expect(res.status).toBe(201);
@@ -77,27 +77,27 @@ describe("Shelf Types", () => {
 			await loginAsNewUser("st-missing@test.com");
 			const csrf = await getCsrf();
 			const res = await agent
-				.post("/shelf/shelf-types")
+				.post("/shelf/shelf-type")
 				.set("x-csrf-token", csrf)
 				.send({});
 			expect(res.status).toBe(400);
 		});
 	});
 
-	describe("PATCH /shelf/shelf-types", () => {
+	describe("PATCH /shelf/shelf-type", () => {
 		it("renames a shelf type", async () => {
 			await loginAsNewUser("st-rename@test.com");
 
 			let csrf = await getCsrf();
 			const createRes = await agent
-				.post("/shelf/shelf-types")
+				.post("/shelf/shelf-type")
 				.set("x-csrf-token", csrf)
 				.send({ name: "Pantry" });
 			const shelfTypeId = createRes.body.shelfType._id;
 
 			csrf = await getCsrf();
 			const res = await agent
-				.patch("/shelf/shelf-types")
+				.patch("/shelf/shelf-type")
 				.set("x-csrf-token", csrf)
 				.send({ shelfTypeId, name: "Cupboard" });
 			expect(res.status).toBe(200);
@@ -107,27 +107,27 @@ describe("Shelf Types", () => {
 			await loginAsNewUser("st-404@test.com");
 			const csrf = await getCsrf();
 			const res = await agent
-				.patch("/shelf/shelf-types")
+				.patch("/shelf/shelf-type")
 				.set("x-csrf-token", csrf)
 				.send({ shelfTypeId: "000000000000000000000001", name: "Ghost" });
 			expect(res.status).toBe(404);
 		});
 	});
 
-	describe("DELETE /shelf/shelf-types", () => {
+	describe("DELETE /shelf/shelf-type", () => {
 		it("deletes a shelf type", async () => {
 			await loginAsNewUser("st-delete@test.com");
 
 			let csrf = await getCsrf();
 			const createRes = await agent
-				.post("/shelf/shelf-types")
+				.post("/shelf/shelf-type")
 				.set("x-csrf-token", csrf)
 				.send({ name: "To Delete" });
 			const shelfTypeId = createRes.body.shelfType._id;
 
 			csrf = await getCsrf();
 			const res = await agent
-				.delete("/shelf/shelf-types")
+				.delete("/shelf/shelf-type")
 				.set("x-csrf-token", csrf)
 				.send({ shelfTypeId });
 			expect(res.status).toBe(200);
@@ -137,7 +137,7 @@ describe("Shelf Types", () => {
 			await loginAsNewUser("st-del-missing@test.com");
 			const csrf = await getCsrf();
 			const res = await agent
-				.delete("/shelf/shelf-types")
+				.delete("/shelf/shelf-type")
 				.set("x-csrf-token", csrf)
 				.send({});
 			expect(res.status).toBe(400);
@@ -150,24 +150,24 @@ describe("Shelf Types", () => {
 // ---------------------------------------------------------------------------
 
 describe("Shelf Place Types", () => {
-	describe("GET /shelf/shelf-place-types", () => {
+	describe("GET /shelf/shelf-place-type", () => {
 		it("returns empty list initially", async () => {
 			await loginAsNewUser("spt-list@test.com");
 			const csrf = await getCsrf();
 			const res = await agent
-				.get("/shelf/shelf-place-types")
+				.get("/shelf/shelf-place-type")
 				.set("x-csrf-token", csrf);
 			expect(res.status).toBe(200);
 			expect(res.body.shelfPlaces).toEqual([]);
 		});
 	});
 
-	describe("POST /shelf/shelf-place-types", () => {
+	describe("POST /shelf/shelf-place-type", () => {
 		it("creates a shelf place type and returns 201", async () => {
 			await loginAsNewUser("spt-create@test.com");
 			const csrf = await getCsrf();
 			const res = await agent
-				.post("/shelf/shelf-place-types")
+				.post("/shelf/shelf-place-type")
 				.set("x-csrf-token", csrf)
 				.send({ name: "Top Shelf" });
 			expect(res.status).toBe(201);
@@ -175,40 +175,40 @@ describe("Shelf Place Types", () => {
 		});
 	});
 
-	describe("PATCH /shelf/shelf-place-types", () => {
+	describe("PATCH /shelf/shelf-place-type", () => {
 		it("renames a shelf place type", async () => {
 			await loginAsNewUser("spt-rename@test.com");
 
 			let csrf = await getCsrf();
 			const createRes = await agent
-				.post("/shelf/shelf-place-types")
+				.post("/shelf/shelf-place-type")
 				.set("x-csrf-token", csrf)
 				.send({ name: "Bottom" });
 			const shelfPlaceTypeId = createRes.body.shelfPlaceType._id;
 
 			csrf = await getCsrf();
 			const res = await agent
-				.patch("/shelf/shelf-place-types")
+				.patch("/shelf/shelf-place-type")
 				.set("x-csrf-token", csrf)
 				.send({ shelfPlaceTypeId, name: "Middle" });
 			expect(res.status).toBe(200);
 		});
 	});
 
-	describe("DELETE /shelf/shelf-place-types", () => {
+	describe("DELETE /shelf/shelf-place-type", () => {
 		it("deletes a shelf place type", async () => {
 			await loginAsNewUser("spt-delete@test.com");
 
 			let csrf = await getCsrf();
 			const createRes = await agent
-				.post("/shelf/shelf-place-types")
+				.post("/shelf/shelf-place-type")
 				.set("x-csrf-token", csrf)
 				.send({ name: "Removable" });
 			const shelfPlaceTypeId = createRes.body.shelfPlaceType._id;
 
 			csrf = await getCsrf();
 			const res = await agent
-				.delete("/shelf/shelf-place-types")
+				.delete("/shelf/shelf-place-type")
 				.set("x-csrf-token", csrf)
 				.send({ shelfPlaceTypeId });
 			expect(res.status).toBe(200);
