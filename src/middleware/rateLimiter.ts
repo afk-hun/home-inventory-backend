@@ -10,6 +10,7 @@ export const loginLimiter = rateLimit({
 	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
 	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 	skipSuccessfulRequests: false, // Count successful requests
+	skip: () => process.env.NODE_ENV === "test",
 });
 
 export const signupLimiter = rateLimit({
@@ -21,4 +22,5 @@ export const signupLimiter = rateLimit({
 	},
 	standardHeaders: true,
 	legacyHeaders: false,
+	skip: () => process.env.NODE_ENV === "test",
 });
