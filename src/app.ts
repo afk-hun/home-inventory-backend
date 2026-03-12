@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth";
 import householdRoutes from "./routes/household";
 import shelf from "./routes/shelf";
+import unitRoutes from "./routes/unit";
 
 const app = express();
 
@@ -89,6 +90,7 @@ app.use((req, res, next) => {
 app.use("/auth", authRoutes);
 app.use("/household", householdRoutes);
 app.use("/shelf", shelf);
+app.use("/unit", unitRoutes);
 
 app.get("/health", (_req, res) => {
 	res.json({ status: "ok" });

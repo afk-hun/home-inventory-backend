@@ -8,14 +8,14 @@ const router = Router();
 
 // router.get("/csrf-token", csrfToken);
 
-router.get("/shelf-place-types", isAuth, validateCsrf, getShelfPlaceTypes);
-router.post("/shelf-place-types", isAuth, validateCsrf, createShelfPlaceType);
-router.patch("/shelf-place-types", isAuth, validateCsrf, renameShelfPlaceType);
-router.delete("/shelf-place-types", isAuth, validateCsrf, deleteShelfPlaceType);
+router.get("/shelf-place-type", isAuth, validateCsrf, getShelfPlaceTypes);
+router.post("/shelf-place-type", isAuth, validateCsrf, createShelfPlaceType);
+router.patch("/shelf-place-type", isAuth, validateCsrf, renameShelfPlaceType);
+router.delete("/shelf-place-type", isAuth, validateCsrf, deleteShelfPlaceType);
 
-router.get("/shelf-types", isAuth, validateCsrf, getShelfTypes);
-router.post("/shelf-types", isAuth, validateCsrf, createShelfType);
-router.patch("/shelf-types", isAuth, validateCsrf, renameShelfType);
-router.delete("/shelf-types", isAuth, validateCsrf, deleteShelfType);
+router.get("/shelf-type", isAuth, validateCsrf, getShelfTypes);
+router.post("/shelf-type", isAuth, validateCsrf, createShelfType);
+router.patch("/shelf-type", isAuth, validateCsrf, renameShelfType);
+router.delete("/shelf-type", isAuth, validateCsrf, deleteShelfType);
 
 export default router;
