@@ -39,15 +39,10 @@ export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 			}
 			req.user = user;
 
-			return Household.findOne({ "owner._id": user._id });
-		})
-		.then((household) => {
-			if (household) {
-				req.householdId = household._id.toString();
-			} else {
-				req.householdId = undefined;
-			}
+			req.householdId = req.cookies?.household_id;
 			next();
+
+			//return Household.findOne({ "owner._id": user._id });
 		})
 		.catch(() => {
 			res.status(401).json({ message: "Unauthorized" });

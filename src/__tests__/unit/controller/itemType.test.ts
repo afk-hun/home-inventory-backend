@@ -74,8 +74,8 @@ describe("getItemTypes", () => {
 
 	it("returns 200 with itemTypes array on happy path", async () => {
 		const mockDocs = [
-			{ _id: "it-1", id: "it-1", name: "Electronics", householdId: "hh-1" },
-			{ _id: "it-2", id: "it-2", name: "Furniture", householdId: "hh-1" },
+			{ _id: "it-1", name: "Electronics", householdId: "hh-1" },
+			{ _id: "it-2", name: "Furniture", householdId: "hh-1" },
 		];
 		(ItemType.find as any).mockResolvedValue(mockDocs);
 
@@ -89,7 +89,6 @@ describe("getItemTypes", () => {
 		expect(res.json).toHaveBeenCalledWith({
 			itemTypes: mockDocs.map((d) => ({
 				_id: d._id,
-				id: d.id,
 				name: d.name,
 				householdId: d.householdId,
 			})),
