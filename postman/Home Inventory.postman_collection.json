@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "4d154956-f9dd-4b65-80f6-32bd36f0b770",
+    "_postman_id": "c0a23b0d-f640-48bd-b3d5-37c39ab450ac",
     "name": "Home Inventory",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "23531317"
@@ -697,13 +697,13 @@
               "raw": ""
             },
             "url": {
-              "raw": "{{api_domain}}/invoice/invoice?page=1&limit=5",
+              "raw": "{{api_domain}}/invoice/invoices?page=1&limit=5",
               "host": [
                 "{{api_domain}}"
               ],
               "path": [
                 "invoice",
-                "invoice"
+                "invoices"
               ],
               "query": [
                 {
