@@ -84,7 +84,7 @@ export const createStore = (
 ) => {
 	const user = req.user;
 	const householdId = req.householdId;
-	const { id, name } = req.body;
+	const name = req.body.name;
 
 	if (!user) {
 		const error = new Error("User not found") as any;
@@ -98,13 +98,13 @@ export const createStore = (
 		return next(error);
 	}
 
-	if (!id || !name) {
-		const error = new Error("Store ID and name are required") as any;
+	if (!name) {
+		const error = new Error("Store name is required") as any;
 		error.statusCode = 400;
 		return next(error);
 	}
 
-	const store = new Store({ householdId, id, name, invoices: [] });
+	const store = new Store({ householdId, name, invoices: [] });
 
 	store
 		.save()
@@ -123,7 +123,7 @@ export const updateStore = (
 	next: NextFunction,
 ) => {
 	const householdId = req.householdId;
-	const { storeId, id, name } = req.body;
+	const { storeId, name } = req.body;
 
 	if (!storeId) {
 		const error = new Error("Store ID is required") as any;
@@ -139,7 +139,6 @@ export const updateStore = (
 				throw error;
 			}
 
-			if (id !== undefined) store.id = id;
 			if (name !== undefined) store.name = name;
 
 			return store.save();

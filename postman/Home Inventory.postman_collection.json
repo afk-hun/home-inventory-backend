@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "c0a23b0d-f640-48bd-b3d5-37c39ab450ac",
+    "_postman_id": "9d82346c-dc65-4132-9906-063cad3c9b3b",
     "name": "Home Inventory",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "23531317"
@@ -531,6 +531,161 @@
       ]
     },
     {
+      "name": "itemType",
+      "item": [
+        {
+          "name": "itemType",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "itemType",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test Item Type\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "itemType",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"itemTypeId\": \"69a88412a14a788a709ade29\",\n    \"name\": \"Renamed Item Type\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "itemType",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"itemTypeId\": \"69a88412a14a788a709ade29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item-type"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "unit",
       "item": [
         {
@@ -673,52 +828,6 @@
     {
       "name": "invoice",
       "item": [
-        {
-          "name": "invoice",
-          "protocolProfileBehavior": {
-            "disableBodyPruning": true
-          },
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-CSRF-Token",
-                "value": "{{csrf_token}}",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": ""
-            },
-            "url": {
-              "raw": "{{api_domain}}/invoice/invoices?page=1&limit=5",
-              "host": [
-                "{{api_domain}}"
-              ],
-              "path": [
-                "invoice",
-                "invoices"
-              ],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "5"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
         {
           "name": "invoice by id",
           "protocolProfileBehavior": {
@@ -988,7 +1097,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"id\": \"STORE-001\",\n    \"name\": \"Test Store\"\n}",
+              "raw": "{\n    \"name\": \"Test Store\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1184,7 +1293,7 @@
   "variable": [
     {
       "key": "api_domain",
-      "value": ""
+      "value": "localhost:3000"
     },
     {
       "key": "csrf_token",

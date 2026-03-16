@@ -9,7 +9,6 @@ export interface IStoreInvoice {
 export interface IStore extends Document {
 	_id: Types.ObjectId;
 	householdId: Types.ObjectId;
-	id: string;
 	name: string;
 	invoices: IStoreInvoice[];
 }
@@ -33,7 +32,6 @@ const storeSchema = new mongoose.Schema<IStore>({
 		ref: "Household",
 		required: true,
 	},
-	id: { type: String, required: true },
 	name: { type: String, required: true },
 	invoices: { type: [storeInvoiceSchema], default: [] },
 });
