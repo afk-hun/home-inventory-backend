@@ -100,7 +100,7 @@ describe("GET /store/store/:id", () => {
 		const createRes = await agent
 			.post("/store/store")
 			.set("x-csrf-token", createCsrf)
-			.send({ id: "S001", name: "Test Grocery" });
+			.send({ name: "Test Grocery" });
 
 		expect(createRes.status).toBe(201);
 		const storeId = createRes.body.store._id;
@@ -113,7 +113,6 @@ describe("GET /store/store/:id", () => {
 		expect(res.status).toBe(200);
 		expect(res.body.store).toBeDefined();
 		expect(res.body.store.name).toBe("Test Grocery");
-		expect(res.body.store.id).toBe("S001");
 	});
 });
 
@@ -141,29 +140,18 @@ describe("POST /store/store", () => {
 		expect(res.status).toBe(400);
 	});
 
-	it("returns 400 when id is missing", async () => {
-		await loginAsNewUser("store-create-400-id@test.com");
-		const csrf = await getCsrf();
-		const res = await agent
-			.post("/store/store")
-			.set("x-csrf-token", csrf)
-			.send({ name: "Costco" }); // missing id
-		expect(res.status).toBe(400);
-	});
-
 	it("returns 201 with store in body on valid create", async () => {
 		await loginAsNewUser("store-create-201@test.com");
 		const csrf = await getCsrf();
 		const res = await agent
 			.post("/store/store")
 			.set("x-csrf-token", csrf)
-			.send({ id: "S002", name: "Walmart" });
+			.send({ name: "Walmart" });
 
 		expect(res.status).toBe(201);
 		expect(res.body.message).toBe("Store created!");
 		expect(res.body.store).toBeDefined();
 		expect(res.body.store.name).toBe("Walmart");
-		expect(res.body.store.id).toBe("S002");
 		expect(res.body.store._id).toBeDefined();
 	});
 });
@@ -211,7 +199,7 @@ describe("PATCH /store/store", () => {
 		const createRes = await agent
 			.post("/store/store")
 			.set("x-csrf-token", createCsrf)
-			.send({ id: "S003", name: "Old Name" });
+			.send({ name: "Old Name" });
 		expect(createRes.status).toBe(201);
 		const storeId = createRes.body.store._id;
 
@@ -270,7 +258,7 @@ describe("DELETE /store/store", () => {
 		const createRes = await agent
 			.post("/store/store")
 			.set("x-csrf-token", createCsrf)
-			.send({ id: "S004", name: "Doomed Store" });
+			.send({ name: "Doomed Store" });
 		expect(createRes.status).toBe(201);
 		const storeId = createRes.body.store._id;
 
@@ -340,7 +328,7 @@ describe("POST /store/store/add-invoice", () => {
 		const createRes = await agent
 			.post("/store/store")
 			.set("x-csrf-token", createCsrf)
-			.send({ id: "S005", name: "Market Fresh Store" });
+			.send({ name: "Market Fresh Store" });
 		expect(createRes.status).toBe(201);
 		const storeId = createRes.body.store._id;
 
