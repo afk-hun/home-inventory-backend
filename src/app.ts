@@ -5,6 +5,7 @@ import authRoutes from "./routes/auth";
 import householdRoutes from "./routes/household";
 import shelf from "./routes/shelf";
 import unitRoutes from "./routes/unit";
+import invoiceRoutes from "./routes/invoice";
 
 const app = express();
 
@@ -91,6 +92,7 @@ app.use("/auth", authRoutes);
 app.use("/household", householdRoutes);
 app.use("/shelf", shelf);
 app.use("/unit", unitRoutes);
+app.use("/invoice", invoiceRoutes);
 
 app.get("/health", (_req, res) => {
 	res.json({ status: "ok" });

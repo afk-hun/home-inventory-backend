@@ -1,0 +1,947 @@
+{
+  "info": {
+    "_postman_id": "c0a23b0d-f640-48bd-b3d5-37c39ab450ac",
+    "name": "Home Inventory",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "23531317"
+  },
+  "item": [
+    {
+      "name": "household",
+      "item": [
+        {
+          "name": "setHouseHold",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"householdId\": \"69a88412a14a788a709ade29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/household/set-household",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "household",
+                "set-household"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "households",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"userId\": \"699b00468476d6085e9f7043\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/household/households",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "household",
+                "households"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "create Household",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test user household\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/household/create",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "household",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "deleteHousehold",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"householdId\": \"69a73d30d3759f6e1a3b0b63\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/household/remove",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "household",
+                "remove"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "renameHousehold",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "164613b5b728262a726365f6db0089aa98d7159f8b5102d3f98218e40b32a62e",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"householdId\": \"69a5c9f8c53f4790bf8cb700\",\n    \"name\": \"Renamed household\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/household/rename",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "household",
+                "rename"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "auth",
+      "item": [
+        {
+          "name": "Signup user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"test user 1\",\n    \"email\": \"test@mail.com\",\n    \"password\": \"tester\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/auth/signup",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "auth",
+                "signup"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"test@mail.com\",\n    \"password\": \"tester\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/auth/login",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "shelfPlaceType",
+      "item": [
+        {
+          "name": "shelfPlaceType",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"userId\": \"699b00468476d6085e9f7043\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf-place-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf-place-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelfPlaceType",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test shelf place 2\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf-place-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf-place-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelfPlaceType",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shelfPlaceTypeId\": \"69b0770cca960bb7eafdce5a\",\n    \"name\": \"Renamed self place\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf-place-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf-place-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelfPlaceType",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shelfPlaceTypeId\": \"69b0770cca960bb7eafdce5a\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf-place-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf-place-type"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "shelfType",
+      "item": [
+        {
+          "name": "shelfType",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"userId\": \"699b00468476d6085e9f7043\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelfType",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test shelf type 2\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelfType",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shelfTypeId\": \"69b07da0fa481ce2553f1cb2\",\n    \"name\": \"Renamed self type\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelfType",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shelfTypeId\": \"69b07da0fa481ce2553f1cb2\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf-type"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "unit",
+      "item": [
+        {
+          "name": "unit",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"userId\": \"699b00468476d6085e9f7043\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/unit/unit-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "unit",
+                "unit-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "unit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test Unit\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/unit/unit-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "unit",
+                "unit-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "unit",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shelfTypeId\": \"69b07da0fa481ce2553f1cb2\",\n    \"name\": \"Renamed self type\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/unit/unit-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "unit",
+                "unit-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "unit",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"unitTypeId\": \"69b2ad46b0f6a3dd16c394bc\"\n}"
+            },
+            "url": {
+              "raw": "{{api_domain}}/unit/unit-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "unit",
+                "unit-type"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "invoice",
+      "item": [
+        {
+          "name": "invoice",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice/invoices?page=1&limit=5",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice",
+                "invoices"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice by id",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice/invoice/:id",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice",
+                "invoice",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "69a88412a14a788a709ade29"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"storeName\": \"Test Store\",\n    \"storeAddress\": \"123 Test Street\",\n    \"purchaseDate\": \"2026-03-16T00:00:00.000Z\",\n    \"invoiceItems\": [\n        {\n            \"inStoreId\": \"ITEM-001\",\n            \"inStoreName\": \"Test Item\",\n            \"inStorePrice\": 9.99,\n            \"inStoreUnitPrice\": 9.99,\n            \"inStoreQuantity\": \"1\",\n            \"inStoreUnit\": \"pcs\",\n            \"inStoreTaxType\": \"standard\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice/invoice",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice",
+                "invoice"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"invoiceId\": \"69a88412a14a788a709ade29\",\n    \"storeName\": \"Updated Store Name\",\n    \"storeAddress\": \"456 Updated Street\",\n    \"purchaseDate\": \"2026-03-16T00:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice/invoice",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice",
+                "invoice"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"invoiceId\": \"69a88412a14a788a709ade29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice/invoice",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice",
+                "invoice"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "EnsureCSRF token",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"name\": \"test user 1\",\n    \"email\": \"test@mail.com\",\n    \"password\": \"tester\"\n}"
+        },
+        "url": {
+          "raw": "{{api_domain}}/auth/csrf-token",
+          "host": [
+            "{{api_domain}}"
+          ],
+          "path": [
+            "auth",
+            "csrf-token"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "api_domain",
+      "value": ""
+    },
+    {
+      "key": "csrf_token",
+      "value": ""
+    }
+  ]
+}
