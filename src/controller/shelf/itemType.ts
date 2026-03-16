@@ -27,7 +27,6 @@ export const getItemTypes = (
 			res.status(200).json({
 				itemTypes: itemTypes.map((itemType) => ({
 					_id: itemType._id,
-					id: itemType.id,
 					name: itemType.name,
 					householdId: itemType.householdId,
 				})),
