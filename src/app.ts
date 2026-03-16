@@ -6,6 +6,7 @@ import householdRoutes from "./routes/household";
 import shelf from "./routes/shelf";
 import unitRoutes from "./routes/unit";
 import invoiceRoutes from "./routes/invoice";
+import storeRoutes from "./routes/store";
 
 const app = express();
 
@@ -93,6 +94,7 @@ app.use("/household", householdRoutes);
 app.use("/shelf", shelf);
 app.use("/unit", unitRoutes);
 app.use("/invoice", invoiceRoutes);
+app.use("/store", storeRoutes);
 
 app.get("/health", (_req, res) => {
 	res.json({ status: "ok" });
