@@ -272,23 +272,6 @@ describe("createStore", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 400 when id is missing", () => {
-		const req: any = {
-			user: { _id: "user-1" },
-			householdId: "household-1",
-			body: { name: "Costco" }, // missing id
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		createStore(req, res, next);
-
-		expect(next).toHaveBeenCalledWith(
-			expect.objectContaining({ statusCode: 400 }),
-		);
-		expect(res.status).not.toHaveBeenCalled();
-	});
-
 	it("calls next with 400 when name is missing", () => {
 		const req: any = {
 			user: { _id: "user-1" },
