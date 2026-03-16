@@ -5,6 +5,7 @@ import { getShelfPlaceTypes, createShelfPlaceType, renameShelfPlaceType, deleteS
 import { getShelfTypes, createShelfType, renameShelfType, deleteShelfType } from "../controller/shelf/type";
 import { getItemTypes, createItemType, renameItemType, deleteItemType } from "../controller/shelf/itemType";
 import { getItem, getItems, createItem, updateItem, deleteItem, addConnectedStore } from "../controller/shelf/item";
+import { getShelves, getShelf, createShelf, updateShelf, deleteShelf, addShelfItem, removeShelfItem } from "../controller/shelf/shelf";
 
 const router = Router();
 
@@ -31,5 +32,14 @@ router.post("/item/add-store", isAuth, validateCsrf, addConnectedStore);
 router.post("/item", isAuth, validateCsrf, createItem);
 router.patch("/item", isAuth, validateCsrf, updateItem);
 router.delete("/item", isAuth, validateCsrf, deleteItem);
+// Register specific sub-paths before /:id to avoid Express matching them as params
+router.post("/shelf/add-item", isAuth, validateCsrf, addShelfItem);
+router.delete("/shelf/remove-item", isAuth, validateCsrf, removeShelfItem);
+
+router.get("/shelf/:id", isAuth, validateCsrf, getShelf);
+router.get("/shelf", isAuth, validateCsrf, getShelves);
+router.post("/shelf", isAuth, validateCsrf, createShelf);
+router.patch("/shelf", isAuth, validateCsrf, updateShelf);
+router.delete("/shelf", isAuth, validateCsrf, deleteShelf);
 
 export default router;

@@ -1482,6 +1482,292 @@
       ]
     },
     {
+      "name": "shelf",
+      "item": [
+        {
+          "name": "shelves",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf?page=1&limit=5",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelf by id",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf/:id",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "69a88412a14a788a709ade29"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelf",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test Shelf\",\n    \"place\": \"shelfPlaceTypeId\",\n    \"type\": \"shelfTypeId\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelf",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shelfId\": \"69a88412a14a788a709ade29\",\n    \"name\": \"Updated Shelf Name\",\n    \"place\": \"shelfPlaceTypeId\",\n    \"type\": \"shelfTypeId\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "shelf",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shelfId\": \"69a88412a14a788a709ade29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "add-item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shelfId\": \"\",\n    \"itemId\": \"\",\n    \"itemName\": \"\",\n    \"quantity\": 1,\n    \"unit\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf/add-item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf",
+                "add-item"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "remove-item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shelfId\": \"69a88412a14a788a709ade29\",\n    \"shelfItemId\": \"69a88412a14a788a709ade30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/shelf/remove-item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "shelf",
+                "remove-item"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "EnsureCSRF token",
       "protocolProfileBehavior": {
         "disableBodyPruning": true
