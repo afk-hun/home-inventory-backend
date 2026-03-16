@@ -4,6 +4,7 @@ import { isAuth } from "../middleware/isAuth";
 import { getShelfPlaceTypes, createShelfPlaceType, renameShelfPlaceType, deleteShelfPlaceType } from "../controller/shelf/placeType";
 import { getShelfTypes, createShelfType, renameShelfType, deleteShelfType } from "../controller/shelf/type";
 import { getItemTypes, createItemType, renameItemType, deleteItemType } from "../controller/shelf/itemType";
+import { getItem, getItems, createItem, updateItem, deleteItem, addConnectedStore } from "../controller/shelf/item";
 
 const router = Router();
 
@@ -23,5 +24,12 @@ router.get("/item-type", isAuth, validateCsrf, getItemTypes);
 router.post("/item-type", isAuth, validateCsrf, createItemType);
 router.patch("/item-type", isAuth, validateCsrf, renameItemType);
 router.delete("/item-type", isAuth, validateCsrf, deleteItemType);
+
+router.get("/item/:id", isAuth, validateCsrf, getItem);
+router.get("/item", isAuth, validateCsrf, getItems);
+router.post("/item/add-store", isAuth, validateCsrf, addConnectedStore);
+router.post("/item", isAuth, validateCsrf, createItem);
+router.patch("/item", isAuth, validateCsrf, updateItem);
+router.delete("/item", isAuth, validateCsrf, deleteItem);
 
 export default router;
