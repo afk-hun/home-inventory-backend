@@ -686,6 +686,253 @@
       ]
     },
     {
+      "name": "item",
+      "item": [
+        {
+          "name": "item",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item?page=1&limit=10",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "item by id",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item/:id",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "69a88412a14a788a709ade29"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test Item\",\n    \"type\": \"69a88412a14a788a709ade29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"itemId\": \"69a88412a14a788a709ade29\",\n    \"name\": \"Renamed Item\",\n    \"type\": \"69a88412a14a788a709ade30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"itemId\": \"69a88412a14a788a709ade29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "add-store",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"itemId\": \"69a88412a14a788a709ade29\",\n    \"storeId\": \"69a88412a14a788a709ade30\",\n    \"storeItemId\": \"69a88412a14a788a709ade31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shelf/item/add-store",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shelf",
+                "item",
+                "add-store"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "unit",
       "item": [
         {
