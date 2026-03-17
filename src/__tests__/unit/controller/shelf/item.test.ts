@@ -504,7 +504,7 @@ describe("addConnectedStore", () => {
 
 		const req: any = {
 			householdId: "household-1",
-			body: { itemId: "item-1", storeId: "nonexistent-store", storeItemId: "SKU-001" },
+			body: { itemId: "item-1", storeId: "nonexistent-store", storeItemId: "SKU-001", storeItemName: "Generic Milk" },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -530,7 +530,7 @@ describe("addConnectedStore", () => {
 
 		const req: any = {
 			householdId: "household-1",
-			body: { itemId: "nonexistent-item", storeId: "store-1", storeItemId: "SKU-001" },
+			body: { itemId: "nonexistent-item", storeId: "store-1", storeItemId: "SKU-001", storeItemName: "Generic Milk" },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -574,7 +574,7 @@ describe("addConnectedStore", () => {
 
 		const req: any = {
 			householdId: "household-1",
-			body: { itemId: "item-1", storeId: "store-1", storeItemId: "SKU-001" },
+			body: { itemId: "item-1", storeId: "store-1", storeItemId: "SKU-001", storeItemName: "Generic Milk" },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
