@@ -195,7 +195,7 @@ export const addConnectedStore = (
 	next: NextFunction,
 ) => {
 	const householdId = req.householdId;
-	const { itemId, storeId, storeItemId } = req.body;
+	const { itemId, storeId, storeItemId, storeItemName } = req.body;
 
 	if (!householdId) {
 		const error = new Error("Household not found") as any;
@@ -203,9 +203,9 @@ export const addConnectedStore = (
 		return next(error);
 	}
 
-	if (!itemId || !storeId || !storeItemId) {
+	if (!itemId || !storeId || !storeItemId || !storeItemName) {
 		const error = new Error(
-			"Item ID, store ID, and store item ID are required",
+			"Item ID, store ID, store item ID, and store item name are required",
 		) as any;
 		error.statusCode = 400;
 		return next(error);
@@ -230,6 +230,7 @@ export const addConnectedStore = (
 					storeId: store._id,
 					storeName: store.name,
 					storeItemId,
+					storeItemName,
 				});
 
 				return item.save();
