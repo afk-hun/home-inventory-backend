@@ -2,30 +2,24 @@ import { NextFunction, Request, Response } from "express";
 
 import Invoice from "../models/invoice";
 
-export const getInvoice = (req: Request, res: Response, next: NextFunction) => {
-	const user = req.user;
-	const { id } = req.params;
+export const getInvoices = (req: Request, res: Response, next: NextFunction) => {
+	const householdId = req.householdId;
+	const { storeId } = req.query;
 
-	if (!user) {
-		const error = new Error("User not found") as any;
+	if (!householdId) {
+		const error = new Error("Household not found") as any;
 		error.statusCode = 404;
 		return next(error);
 	}
 
-	if (!id) {
-		const error = new Error("Invoice ID is required") as any;
-		error.statusCode = 400;
-		return next(error);
+	const filter: Record<string, unknown> = { householdId };
+	if (storeId && typeof storeId === "string") {
+		filter.storeId = storeId;
 	}
 
-	Invoice.findById(id)
-		.then((invoice) => {
-			if (!invoice) {
-				const error = new Error("Invoice not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			res.status(200).json({ invoice });
+	Invoice.find(filter)
+		.then((invoices) => {
+			res.status(200).json({ invoices });
 		})
 		.catch((err) => {
 			if (!err.statusCode) err.statusCode = 500;
