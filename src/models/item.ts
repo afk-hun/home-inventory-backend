@@ -23,8 +23,8 @@ const connectedStoreSchema = new mongoose.Schema<IConnectedStore>(
 			required: true,
 		},
 		storeName: { type: String, required: true },
-		storeItemId: { type: String, required: true },
-		storeItemName: { type: String, required: true },
+		storeItemId: { type: String, default: "" },
+		storeItemName: { type: String, default: "" },
 	},
 	{ _id: false },
 );

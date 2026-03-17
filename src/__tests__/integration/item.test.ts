@@ -316,7 +316,7 @@ describe("POST /shelf/item/add-store", () => {
 		const res = await agent
 			.post("/shelf/item/add-store")
 			.set("x-csrf-token", csrf)
-			.send({ itemId, storeId: fakeStoreId, storeItemId: "SKU-001" });
+			.send({ itemId, storeId: fakeStoreId, storeItemId: "SKU-001", storeItemName: "Generic Cereal" });
 		expect(res.status).toBe(404);
 	});
 
@@ -346,7 +346,7 @@ describe("POST /shelf/item/add-store", () => {
 		const res = await agent
 			.post("/shelf/item/add-store")
 			.set("x-csrf-token", csrf)
-			.send({ itemId, storeId, storeItemId: "SKU-001" });
+			.send({ itemId, storeId, storeItemId: "SKU-001", storeItemName: "OJ Brand" });
 
 		expect(res.status).toBe(200);
 		expect(res.body.message).toBe("Store added to item");
