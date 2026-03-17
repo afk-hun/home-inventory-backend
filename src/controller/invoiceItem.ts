@@ -7,15 +7,18 @@ export const getInvoiceItems = (
 	res: Response,
 	next: NextFunction,
 ) => {
-	const { invoiceId } = req.query;
+	const householdId = req.householdId;
 
-	if (!invoiceId) {
-		const error = new Error("Invoice ID is required") as any;
-		error.statusCode = 400;
+	if (!householdId) {
+		const error = new Error("Household not found") as any;
+		error.statusCode = 404;
 		return next(error);
 	}
 
-	InvoiceItem.find({ invoiceId })
+	const filter: Record<string, unknown> = { householdId };
+	if (req.query.storeId) filter["store.id"] = req.query.storeId;
+
+	InvoiceItem.find(filter)
 		.then((items) => {
 			res.status(200).json({ invoiceItems: items });
 		})
@@ -58,8 +61,8 @@ export const createInvoiceItem = (
 	res: Response,
 	next: NextFunction,
 ) => {
+	const householdId = req.householdId;
 	const {
-		invoiceId,
 		store,
 		inStoreId,
 		inStoreName,
@@ -70,8 +73,13 @@ export const createInvoiceItem = (
 		inStoreTaxType,
 	} = req.body;
 
+	if (!householdId) {
+		const error = new Error("Household not found") as any;
+		error.statusCode = 404;
+		return next(error);
+	}
+
 	if (
-		!invoiceId ||
 		!store ||
 		!inStoreId ||
 		!inStoreName ||
@@ -87,7 +95,7 @@ export const createInvoiceItem = (
 	}
 
 	const item = new InvoiceItem({
-		invoiceId,
+		householdId,
 		store,
 		inStoreId,
 		inStoreName,

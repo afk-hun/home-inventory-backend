@@ -2,7 +2,7 @@ import mongoose, { Types, Document } from "mongoose";
 
 export interface IInvoiceItem extends Document {
 	_id: Types.ObjectId;
-	invoiceId: Types.ObjectId;
+	householdId: Types.ObjectId;
 	store: {
 		id: string;
 		name: string;
@@ -17,9 +17,9 @@ export interface IInvoiceItem extends Document {
 }
 
 const invoiceItemSchema = new mongoose.Schema<IInvoiceItem>({
-	invoiceId: {
+	householdId: {
 		type: mongoose.Schema.Types.ObjectId,
-		ref: "Invoice",
+		ref: "Household",
 		required: true,
 	},
 	store: {
