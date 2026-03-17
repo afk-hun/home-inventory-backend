@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validateCsrf } from "../middleware/csrf";
 import { isAuth } from "../middleware/isAuth";
 import {
-	getInvoice,
+	getInvoices,
 	createInvoice,
 	updateInvoice,
 	deleteInvoice,
@@ -10,7 +10,7 @@ import {
 
 const router = Router();
 
-router.get("/invoice/:id", isAuth, validateCsrf, getInvoice);
+router.get("/invoice", isAuth, validateCsrf, getInvoices);
 router.post("/invoice", isAuth, validateCsrf, createInvoice);
 router.patch("/invoice", isAuth, validateCsrf, updateInvoice);
 router.delete("/invoice", isAuth, validateCsrf, deleteInvoice);

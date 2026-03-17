@@ -909,7 +909,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"itemId\": \"69a88412a14a788a709ade29\",\n    \"storeId\": \"69a88412a14a788a709ade30\",\n    \"storeItemId\": \"69a88412a14a788a709ade31\"\n}",
+              "raw": "{\n    \"itemId\": \"69a88412a14a788a709ade29\",\n    \"storeId\": \"69a88412a14a788a709ade30\",\n    \"storeItemId\": \"69a88412a14a788a709ade31\",\n    \"storeItemName\": \"Whole Milk 1L\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1076,10 +1076,7 @@
       "name": "invoice",
       "item": [
         {
-          "name": "invoice by id",
-          "protocolProfileBehavior": {
-            "disableBodyPruning": true
-          },
+          "name": "get invoices",
           "request": {
             "method": "GET",
             "header": [
@@ -1099,19 +1096,19 @@
               "raw": ""
             },
             "url": {
-              "raw": "{{api_domain}}/invoice/invoice/:id",
+              "raw": "{{api_domain}}/invoice/invoice?storeId=69a88412a14a788a709ade30",
               "host": [
                 "{{api_domain}}"
               ],
               "path": [
                 "invoice",
-                "invoice",
-                ":id"
+                "invoice"
               ],
-              "variable": [
+              "query": [
                 {
-                  "key": "id",
-                  "value": "69a88412a14a788a709ade29"
+                  "key": "storeId",
+                  "value": "69a88412a14a788a709ade30",
+                  "description": "optional — filter by store"
                 }
               ]
             }

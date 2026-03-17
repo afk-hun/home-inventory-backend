@@ -4,6 +4,7 @@ export interface IConnectedStore {
 	storeId: Types.ObjectId;
 	storeName: string;
 	storeItemId: string;
+	storeItemName: string;
 }
 
 export interface IItem extends Document {
@@ -23,6 +24,7 @@ const connectedStoreSchema = new mongoose.Schema<IConnectedStore>(
 		},
 		storeName: { type: String, required: true },
 		storeItemId: { type: String, required: true },
+		storeItemName: { type: String, required: true },
 	},
 	{ _id: false },
 );
