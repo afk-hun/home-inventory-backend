@@ -1,24 +1,21 @@
 import mongoose, { Types, Document } from "mongoose";
+import { IInvoiceItem } from "./invoiceItem";
 
-export interface IInvoiceItem {
-	inStoreId: string;
-	inStoreName: string;
-	inStorePrice: number;
-	inStoreUnitPrice: number;
-	inStoreQuantity: string;
-	inStoreUnit: string;
-	inStoreTaxType: string;
-}
-
+interface IInvoiceElement extends Omit<
+	IInvoiceItem,
+	"_id" | "householdId" | "store"
+> {}
 export interface IInvoice extends Document {
 	_id: Types.ObjectId;
+	householdId: Types.ObjectId;
+	storeId: Types.ObjectId;
 	storeName: string;
 	storeAddress: string;
 	purchaseDate: Date;
-	invoiceItems: IInvoiceItem[];
+	invoiceItems: IInvoiceElement[];
 }
 
-const invoiceItemSchema = new mongoose.Schema<IInvoiceItem>(
+const invoiceItemSchema = new mongoose.Schema<IInvoiceElement>(
 	{
 		inStoreId: { type: String, required: true },
 		inStoreName: { type: String, required: true },
@@ -32,6 +29,16 @@ const invoiceItemSchema = new mongoose.Schema<IInvoiceItem>(
 );
 
 const invoiceSchema = new mongoose.Schema<IInvoice>({
+	householdId: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: "Household",
+		required: true,
+	},
+	storeId: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: "Store",
+		required: true,
+	},
 	storeName: { type: String, required: true },
 	storeAddress: { type: String, required: true },
 	purchaseDate: { type: Date, required: true },

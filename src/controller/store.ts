@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 
 import Store from "../models/store";
-import Invoice from "../models/invoice";
 
 export const getStore = (req: Request, res: Response, next: NextFunction) => {
 	const user = req.user;
@@ -104,7 +103,7 @@ export const createStore = (
 		return next(error);
 	}
 
-	const store = new Store({ householdId, name, invoices: [] });
+	const store = new Store({ householdId, name });
 
 	store
 		.save()
@@ -177,52 +176,6 @@ export const deleteStore = (
 				throw error;
 			}
 			res.status(200).json({ message: "Store deleted successfully" });
-		})
-		.catch((err) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
-};
-
-export const addInvoice = (req: Request, res: Response, next: NextFunction) => {
-	const householdId = req.householdId;
-	const { storeId, invoiceId } = req.body;
-
-	if (!storeId || !invoiceId) {
-		const error = new Error("Store ID and invoice ID are required") as any;
-		error.statusCode = 400;
-		return next(error);
-	}
-
-	Invoice.findById(invoiceId)
-		.then((invoice) => {
-			if (!invoice) {
-				const error = new Error("Invoice not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-
-			return Store.findOne({ _id: storeId, householdId }).then((store) => {
-				if (!store) {
-					const error = new Error("Store not found") as any;
-					error.statusCode = 404;
-					throw error;
-				}
-
-				store.invoices.push({
-					invoiceId: invoice._id,
-					storeName: invoice.storeName,
-					purchaseDate: invoice.purchaseDate,
-				});
-
-				return store.save();
-			});
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Invoice added to store",
-				store: updated,
-			});
 		})
 		.catch((err) => {
 			if (!err.statusCode) err.statusCode = 500;

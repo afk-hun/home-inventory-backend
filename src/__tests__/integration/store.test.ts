@@ -4,7 +4,6 @@ import bcrypt from "bcryptjs";
 import app from "../../app";
 import User from "../../models/user";
 import Household from "../../models/household";
-import Invoice from "../../models/invoice";
 import mongoose from "mongoose";
 
 let agent: ReturnType<typeof request.agent>;
@@ -126,7 +125,7 @@ describe("POST /store/store", () => {
 		const res = await agent
 			.post("/store/store")
 			.set("x-csrf-token", csrf)
-			.send({ id: "S001", name: "Costco" });
+			.send({ name: "Costco" });
 		expect(res.status).toBe(401);
 	});
 
@@ -136,7 +135,7 @@ describe("POST /store/store", () => {
 		const res = await agent
 			.post("/store/store")
 			.set("x-csrf-token", csrf)
-			.send({ id: "S001" }); // missing name
+			.send({}); // missing name
 		expect(res.status).toBe(400);
 	});
 
@@ -273,80 +272,3 @@ describe("DELETE /store/store", () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// POST /store/store/add-invoice
-// ---------------------------------------------------------------------------
-
-describe("POST /store/store/add-invoice", () => {
-	it("returns 401 when not authenticated", async () => {
-		const csrf = await getCsrf();
-		const res = await agent
-			.post("/store/store/add-invoice")
-			.set("x-csrf-token", csrf)
-			.send({
-				storeId: new mongoose.Types.ObjectId().toHexString(),
-				invoiceId: new mongoose.Types.ObjectId().toHexString(),
-			});
-		expect(res.status).toBe(401);
-	});
-
-	it("returns 400 when invoiceId is missing", async () => {
-		await loginAsNewUser("store-addinv-400@test.com");
-		const csrf = await getCsrf();
-		const res = await agent
-			.post("/store/store/add-invoice")
-			.set("x-csrf-token", csrf)
-			.send({ storeId: new mongoose.Types.ObjectId().toHexString() });
-		expect(res.status).toBe(400);
-	});
-
-	it("returns 404 for a non-existent invoiceId", async () => {
-		await loginAsNewUser("store-addinv-404inv@test.com");
-		const fakeInvoiceId = new mongoose.Types.ObjectId().toHexString();
-		const fakeStoreId = new mongoose.Types.ObjectId().toHexString();
-		const csrf = await getCsrf();
-		const res = await agent
-			.post("/store/store/add-invoice")
-			.set("x-csrf-token", csrf)
-			.send({ storeId: fakeStoreId, invoiceId: fakeInvoiceId });
-		expect(res.status).toBe(404);
-	});
-
-	it("returns 200 with invoice entry in store.invoices on valid add", async () => {
-		await loginAsNewUser("store-addinv-200@test.com");
-
-		// Create an invoice directly in DB
-		const invoice = await new Invoice({
-			storeName: "Market Fresh",
-			storeAddress: "88 Garden Rd",
-			purchaseDate: new Date("2024-09-15"),
-			invoiceItems: [],
-		}).save();
-
-		// Create a store via the API
-		const createCsrf = await getCsrf();
-		const createRes = await agent
-			.post("/store/store")
-			.set("x-csrf-token", createCsrf)
-			.send({ name: "Market Fresh Store" });
-		expect(createRes.status).toBe(201);
-		const storeId = createRes.body.store._id;
-
-		// Add the invoice to the store
-		const csrf = await getCsrf();
-		const res = await agent
-			.post("/store/store/add-invoice")
-			.set("x-csrf-token", csrf)
-			.send({
-				storeId,
-				invoiceId: invoice._id.toHexString(),
-			});
-
-		expect(res.status).toBe(200);
-		expect(res.body.message).toBe("Invoice added to store");
-		expect(res.body.store).toBeDefined();
-		expect(Array.isArray(res.body.store.invoices)).toBe(true);
-		expect(res.body.store.invoices).toHaveLength(1);
-		expect(res.body.store.invoices[0].storeName).toBe("Market Fresh");
-	});
-});

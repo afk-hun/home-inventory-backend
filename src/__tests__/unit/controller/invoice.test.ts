@@ -134,7 +134,31 @@ describe("createInvoice", () => {
 	it("calls next with 404 when req.user is missing", () => {
 		const req: any = {
 			user: undefined,
+			householdId: "household-1",
 			body: {
+				storeId: "store-1",
+				storeName: "Walmart",
+				storeAddress: "456 Oak Ave",
+				purchaseDate: "2024-06-01",
+			},
+		};
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		createInvoice(req, res, next);
+
+		expect(next).toHaveBeenCalledWith(
+			expect.objectContaining({ statusCode: 404 }),
+		);
+		expect(res.status).not.toHaveBeenCalled();
+	});
+
+	it("calls next with 404 when req.householdId is missing", () => {
+		const req: any = {
+			user: { _id: "user-1" },
+			householdId: undefined,
+			body: {
+				storeId: "store-1",
 				storeName: "Walmart",
 				storeAddress: "456 Oak Ave",
 				purchaseDate: "2024-06-01",
@@ -154,7 +178,8 @@ describe("createInvoice", () => {
 	it("calls next with 400 when required fields are missing", () => {
 		const req: any = {
 			user: { _id: "user-1" },
-			body: { storeName: "Walmart" }, // missing storeAddress and purchaseDate
+			householdId: "household-1",
+			body: { storeName: "Walmart" }, // missing storeId, storeAddress and purchaseDate
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -167,10 +192,11 @@ describe("createInvoice", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 400 when storeName is missing", () => {
+	it("calls next with 400 when storeId is missing", () => {
 		const req: any = {
 			user: { _id: "user-1" },
-			body: { storeAddress: "456 Oak Ave", purchaseDate: "2024-06-01" },
+			householdId: "household-1",
+			body: { storeName: "Walmart", storeAddress: "456 Oak Ave", purchaseDate: "2024-06-01" },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -185,6 +211,8 @@ describe("createInvoice", () => {
 	it("returns 201 with invoice on success", async () => {
 		const savedDoc = {
 			_id: "new-invoice-id",
+			householdId: "household-1",
+			storeId: "store-1",
 			storeName: "Target",
 			storeAddress: "789 Elm St",
 			purchaseDate: new Date("2024-03-15"),
@@ -196,7 +224,9 @@ describe("createInvoice", () => {
 
 		const req: any = {
 			user: { _id: "user-1" },
+			householdId: "household-1",
 			body: {
+				storeId: "store-1",
 				storeName: "Target",
 				storeAddress: "789 Elm St",
 				purchaseDate: "2024-03-15",

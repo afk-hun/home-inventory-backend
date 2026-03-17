@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "9d82346c-dc65-4132-9906-063cad3c9b3b",
+    "_postman_id": "e40bed79-d06c-4084-8541-d557456491f8",
     "name": "Home Inventory",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "23531317"
@@ -1136,7 +1136,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"storeName\": \"Test Store\",\n    \"storeAddress\": \"123 Test Street\",\n    \"purchaseDate\": \"2026-03-16T00:00:00.000Z\",\n    \"invoiceItems\": [\n        {\n            \"inStoreId\": \"ITEM-001\",\n            \"inStoreName\": \"Test Item\",\n            \"inStorePrice\": 9.99,\n            \"inStoreUnitPrice\": 9.99,\n            \"inStoreQuantity\": \"1\",\n            \"inStoreUnit\": \"pcs\",\n            \"inStoreTaxType\": \"standard\"\n        }\n    ]\n}",
+              "raw": "{\n    \"storeId\": \"69a88412a14a788a709ade30\",\n    \"storeName\": \"Test Store\",\n    \"storeAddress\": \"123 Test Street\",\n    \"purchaseDate\": \"2026-03-17T00:00:00.000Z\",\n    \"invoiceItems\": [\n        {\n            \"inStoreId\": \"ITEM-001\",\n            \"inStoreName\": \"Test Item\",\n            \"inStorePrice\": 9.99,\n            \"inStoreUnitPrice\": 9.99,\n            \"inStoreQuantity\": \"1\",\n            \"inStoreUnit\": \"pcs\",\n            \"inStoreTaxType\": \"standard\"\n        }\n    ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1174,7 +1174,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"invoiceId\": \"69a88412a14a788a709ade29\",\n    \"storeName\": \"Updated Store Name\",\n    \"storeAddress\": \"456 Updated Street\",\n    \"purchaseDate\": \"2026-03-16T00:00:00.000Z\"\n}",
+              "raw": "{\n    \"invoiceId\": \"69a88412a14a788a709ade29\",\n    \"storeId\": \"69a88412a14a788a709ade30\",\n    \"storeName\": \"Updated Store Name\",\n    \"storeAddress\": \"456 Updated Street\",\n    \"purchaseDate\": \"2026-03-17T00:00:00.000Z\",\n    \"invoiceItems\": [\n        {\n            \"inStoreId\": \"ITEM-001\",\n            \"inStoreName\": \"Updated Item\",\n            \"inStorePrice\": 12.99,\n            \"inStoreUnitPrice\": 12.99,\n            \"inStoreQuantity\": \"2\",\n            \"inStoreUnit\": \"pcs\",\n            \"inStoreTaxType\": \"standard\"\n        }\n    ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1227,6 +1227,240 @@
               "path": [
                 "invoice",
                 "invoice"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "invoice-item",
+      "item": [
+        {
+          "name": "invoice-items",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice-items by storeId",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item?storeId=69a88412a14a788a709ade30",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item"
+              ],
+              "query": [
+                {
+                  "key": "storeId",
+                  "value": "69a88412a14a788a709ade30"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice-item by id",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item/:id",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "69a88412a14a788a709ade29"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice-item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"store\": {\n        \"id\": \"69a88412a14a788a709ade30\",\n        \"name\": \"Test Store\"\n    },\n    \"inStoreId\": \"ITEM-001\",\n    \"inStoreName\": \"Test Item\",\n    \"inStorePrice\": 9.99,\n    \"inStoreUnitPrice\": 9.99,\n    \"inStoreQuantity\": \"1\",\n    \"inStoreUnit\": \"pcs\",\n    \"inStoreTaxType\": \"standard\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice-item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"invoiceItemId\": \"69a88412a14a788a709ade29\",\n    \"store\": {\n        \"id\": \"69a88412a14a788a709ade30\",\n        \"name\": \"Updated Store\"\n    },\n    \"inStoreName\": \"Updated Item\",\n    \"inStorePrice\": 12.99,\n    \"inStoreUnitPrice\": 12.99\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice-item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"invoiceItemId\": \"69a88412a14a788a709ade29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item"
               ]
             }
           },
@@ -1435,45 +1669,6 @@
               "path": [
                 "store",
                 "store"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "add-invoice",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-CSRF-Token",
-                "value": "{{csrf_token}}",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"storeId\": \"69a88412a14a788a709ade29\",\n    \"invoiceId\": \"69a88412a14a788a709ade30\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{api_domain}}/store/store/add-invoice",
-              "host": [
-                "{{api_domain}}"
-              ],
-              "path": [
-                "store",
-                "store",
-                "add-invoice"
               ]
             }
           },
