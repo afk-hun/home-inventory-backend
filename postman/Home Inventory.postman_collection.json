@@ -1235,6 +1235,205 @@
       ]
     },
     {
+      "name": "invoice-item",
+      "item": [
+        {
+          "name": "invoice-items by invoiceId",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item?invoiceId=69a88412a14a788a709ade29",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item"
+              ],
+              "query": [
+                {
+                  "key": "invoiceId",
+                  "value": "69a88412a14a788a709ade29"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice-item by id",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item/:id",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "69a88412a14a788a709ade29"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice-item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"invoiceId\": \"69a88412a14a788a709ade29\",\n    \"store\": {\n        \"id\": \"69a88412a14a788a709ade30\",\n        \"name\": \"Test Store\"\n    },\n    \"inStoreId\": \"ITEM-001\",\n    \"inStoreName\": \"Test Item\",\n    \"inStorePrice\": 9.99,\n    \"inStoreUnitPrice\": 9.99,\n    \"inStoreQuantity\": \"1\",\n    \"inStoreUnit\": \"pcs\",\n    \"inStoreTaxType\": \"standard\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice-item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"invoiceItemId\": \"69a88412a14a788a709ade29\",\n    \"store\": {\n        \"id\": \"69a88412a14a788a709ade30\",\n        \"name\": \"Updated Store\"\n    },\n    \"inStoreName\": \"Updated Item\",\n    \"inStorePrice\": 12.99,\n    \"inStoreUnitPrice\": 12.99\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "invoice-item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"invoiceItemId\": \"69a88412a14a788a709ade29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/invoice-item",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "invoice-item"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "store",
       "item": [
         {
