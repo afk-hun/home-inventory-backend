@@ -11,7 +11,7 @@ vi.mock("../../../../models/shelf", () => {
 		findOneAndDelete: vi.fn(),
 	};
 	// Constructor mock for createShelf
-	const ShelfConstructor = vi.fn().mockImplementation(function (data: any) {
+	const ShelfConstructor = vi.fn().mockImplementation(function (this: any, data: any) {
 		Object.assign(this, data);
 		this.save = vi.fn();
 	});
@@ -181,7 +181,7 @@ describe("createShelf", () => {
 	it("returns 201 with message and shelf on success", async () => {
 		const savedShelf = { _id: "s1", name: "Kitchen", householdId: "h1" };
 		// The constructor mock's save() should resolve with savedShelf
-		(Shelf as any).mockImplementation(function (data: any) {
+		(Shelf as any).mockImplementation(function (this: any, data: any) {
 			Object.assign(this, data);
 			this.save = vi.fn().mockResolvedValue(savedShelf);
 		});

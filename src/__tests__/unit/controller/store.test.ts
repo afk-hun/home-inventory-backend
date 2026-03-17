@@ -5,7 +5,6 @@ let mockSave = vi.fn();
 
 vi.mock("../../../models/store", () => {
 	const findOne = vi.fn();
-	const find = vi.fn();
 	const countDocuments = vi.fn();
 	const findOneAndDelete = vi.fn();
 
@@ -27,27 +26,13 @@ vi.mock("../../../models/store", () => {
 	return { default: MockStore };
 });
 
-vi.mock("../../../models/invoice", () => {
-	const findById = vi.fn();
-
-	const MockInvoice = vi.fn(function MockInvoiceImpl(this: any, data: any) {
-		Object.assign(this, data);
-	});
-
-	(MockInvoice as any).findById = findById;
-
-	return { default: MockInvoice };
-});
-
 import Store from "../../../models/store";
-import Invoice from "../../../models/invoice";
 import {
 	getStore,
 	getStores,
 	createStore,
 	updateStore,
 	deleteStore,
-	addInvoice,
 } from "../../../controller/store";
 
 const makeMockRes = () => {
@@ -126,9 +111,7 @@ describe("getStore", () => {
 		const mockDoc = {
 			_id: "store-1",
 			householdId: "household-1",
-			id: "S001",
 			name: "Costco",
-			invoices: [],
 		};
 		(Store.findOne as any).mockResolvedValue(mockDoc);
 
@@ -194,8 +177,8 @@ describe("getStores", () => {
 
 	it("returns 200 with pagination shape on success", async () => {
 		const mockStores = [
-			{ _id: "store-1", name: "Costco", id: "S001", invoices: [] },
-			{ _id: "store-2", name: "Target", id: "S002", invoices: [] },
+			{ _id: "store-1", name: "Costco", householdId: "household-1" },
+			{ _id: "store-2", name: "Target", householdId: "household-1" },
 		];
 
 		(Store.countDocuments as any).mockResolvedValue(2);
@@ -242,7 +225,7 @@ describe("createStore", () => {
 		const req: any = {
 			user: undefined,
 			householdId: "household-1",
-			body: { id: "S001", name: "Costco" },
+			body: { name: "Costco" },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -259,7 +242,7 @@ describe("createStore", () => {
 		const req: any = {
 			user: { _id: "user-1" },
 			householdId: undefined,
-			body: { id: "S001", name: "Costco" },
+			body: { name: "Costco" },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -276,7 +259,7 @@ describe("createStore", () => {
 		const req: any = {
 			user: { _id: "user-1" },
 			householdId: "household-1",
-			body: { id: "S001" }, // missing name
+			body: {}, // missing name
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -293,9 +276,7 @@ describe("createStore", () => {
 		const savedDoc = {
 			_id: "new-store-id",
 			householdId: "household-1",
-			id: "S001",
 			name: "Costco",
-			invoices: [],
 		};
 
 		mockSave = vi.fn().mockResolvedValue(savedDoc);
@@ -303,7 +284,7 @@ describe("createStore", () => {
 		const req: any = {
 			user: { _id: "user-1" },
 			householdId: "household-1",
-			body: { id: "S001", name: "Costco" },
+			body: { name: "Costco" },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -366,17 +347,13 @@ describe("updateStore", () => {
 		const updatedDoc = {
 			_id: "store-1",
 			householdId: "household-1",
-			id: "S001",
 			name: "Updated Costco",
-			invoices: [],
 		};
 
 		const mockFoundDoc: any = {
 			_id: "store-1",
 			householdId: "household-1",
-			id: "S001",
 			name: "Old Costco",
-			invoices: [],
 			save: vi.fn().mockResolvedValue(updatedDoc),
 		};
 		(Store.findOne as any).mockResolvedValue(mockFoundDoc);
@@ -446,9 +423,7 @@ describe("deleteStore", () => {
 		const deletedDoc = {
 			_id: "store-1",
 			householdId: "household-1",
-			id: "S001",
 			name: "Costco",
-			invoices: [],
 		};
 		(Store.findOneAndDelete as any).mockResolvedValue(deletedDoc);
 
@@ -464,148 +439,6 @@ describe("deleteStore", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
 		expect(res.json).toHaveBeenCalledWith({
 			message: "Store deleted successfully",
-		});
-		expect(next).not.toHaveBeenCalled();
-	});
-});
-
-// ---------------------------------------------------------------------------
-// addInvoice
-// ---------------------------------------------------------------------------
-
-describe("addInvoice", () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-		mockSave = vi.fn();
-	});
-
-	it("calls next with 400 when storeId is missing", () => {
-		const req: any = {
-			householdId: "household-1",
-			body: { invoiceId: "invoice-1" }, // missing storeId
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		addInvoice(req, res, next);
-
-		expect(next).toHaveBeenCalledWith(
-			expect.objectContaining({ statusCode: 400 }),
-		);
-		expect(res.status).not.toHaveBeenCalled();
-	});
-
-	it("calls next with 400 when invoiceId is missing", () => {
-		const req: any = {
-			householdId: "household-1",
-			body: { storeId: "store-1" }, // missing invoiceId
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		addInvoice(req, res, next);
-
-		expect(next).toHaveBeenCalledWith(
-			expect.objectContaining({ statusCode: 400 }),
-		);
-		expect(res.status).not.toHaveBeenCalled();
-	});
-
-	it("calls next with 404 when Invoice.findById returns null", async () => {
-		(Invoice.findById as any).mockResolvedValue(null);
-
-		const req: any = {
-			householdId: "household-1",
-			body: { storeId: "store-1", invoiceId: "nonexistent-invoice" },
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		addInvoice(req, res, next);
-
-		await vi.waitFor(() =>
-			expect(next).toHaveBeenCalledWith(
-				expect.objectContaining({ statusCode: 404 }),
-			),
-		);
-		expect(res.status).not.toHaveBeenCalled();
-	});
-
-	it("calls next with 404 when Store.findOne returns null", async () => {
-		const mockInvoice = {
-			_id: "invoice-1",
-			storeName: "Costco",
-			purchaseDate: new Date("2024-01-01"),
-		};
-		(Invoice.findById as any).mockResolvedValue(mockInvoice);
-		(Store.findOne as any).mockResolvedValue(null);
-
-		const req: any = {
-			householdId: "household-1",
-			body: { storeId: "nonexistent-store", invoiceId: "invoice-1" },
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		addInvoice(req, res, next);
-
-		await vi.waitFor(() =>
-			expect(next).toHaveBeenCalledWith(
-				expect.objectContaining({ statusCode: 404 }),
-			),
-		);
-		expect(res.status).not.toHaveBeenCalled();
-	});
-
-	it("returns 200 with updated store on success", async () => {
-		const mockInvoice = {
-			_id: "invoice-1",
-			storeName: "Costco",
-			purchaseDate: new Date("2024-01-01"),
-		};
-
-		const updatedDoc = {
-			_id: "store-1",
-			householdId: "household-1",
-			id: "S001",
-			name: "Costco",
-			invoices: [
-				{
-					invoiceId: "invoice-1",
-					storeName: "Costco",
-					purchaseDate: new Date("2024-01-01"),
-				},
-			],
-		};
-
-		const mockFoundStore: any = {
-			_id: "store-1",
-			householdId: "household-1",
-			id: "S001",
-			name: "Costco",
-			invoices: [],
-			push: vi.fn(),
-			save: vi.fn().mockResolvedValue(updatedDoc),
-		};
-		// invoices array with a push method
-		mockFoundStore.invoices = { push: vi.fn() };
-
-		(Invoice.findById as any).mockResolvedValue(mockInvoice);
-		(Store.findOne as any).mockResolvedValue(mockFoundStore);
-
-		const req: any = {
-			householdId: "household-1",
-			body: { storeId: "store-1", invoiceId: "invoice-1" },
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		addInvoice(req, res, next);
-
-		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Invoice added to store",
-			store: updatedDoc,
 		});
 		expect(next).not.toHaveBeenCalled();
 	});

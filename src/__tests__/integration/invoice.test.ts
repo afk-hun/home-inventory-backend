@@ -5,7 +5,7 @@ import app from "../../app";
 import User from "../../models/user";
 import Household from "../../models/household";
 import Invoice from "../../models/invoice";
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -69,8 +69,10 @@ describe("GET /invoice/invoice/:id", () => {
 	it("returns 200 with invoice shape for a valid id", async () => {
 		await loginAsNewUser("inv-get-200@test.com");
 
-		// Create an invoice directly in DB
+		// Create an invoice directly in DB (householdId and storeId are required)
 		const invoice = await new Invoice({
+			householdId: new Types.ObjectId(),
+			storeId: new Types.ObjectId(),
 			storeName: "Grocery World",
 			storeAddress: "42 Market St",
 			purchaseDate: new Date("2024-05-10"),
@@ -100,6 +102,7 @@ describe("POST /invoice/invoice", () => {
 			.post("/invoice/invoice")
 			.set("x-csrf-token", csrf)
 			.send({
+				storeId: new Types.ObjectId().toHexString(),
 				storeName: "Costco",
 				storeAddress: "1 Warehouse Blvd",
 				purchaseDate: "2024-04-01",
@@ -113,7 +116,7 @@ describe("POST /invoice/invoice", () => {
 		const res = await agent
 			.post("/invoice/invoice")
 			.set("x-csrf-token", csrf)
-			.send({ storeName: "Costco" }); // missing storeAddress and purchaseDate
+			.send({ storeName: "Costco" }); // missing storeId, storeAddress and purchaseDate
 		expect(res.status).toBe(400);
 	});
 
@@ -124,6 +127,7 @@ describe("POST /invoice/invoice", () => {
 			.post("/invoice/invoice")
 			.set("x-csrf-token", csrf)
 			.send({
+				storeId: new Types.ObjectId().toHexString(),
 				storeName: "Target",
 				storeAddress: "100 Commerce Ave",
 				purchaseDate: "2024-07-20",
@@ -175,8 +179,10 @@ describe("PATCH /invoice/invoice", () => {
 	it("returns 200 with updated invoice on valid update", async () => {
 		await loginAsNewUser("inv-patch-200@test.com");
 
-		// Create an invoice to update
+		// Create an invoice to update (householdId and storeId are required)
 		const invoice = await new Invoice({
+			householdId: new Types.ObjectId(),
+			storeId: new Types.ObjectId(),
 			storeName: "Old Name",
 			storeAddress: "Old Address",
 			purchaseDate: new Date("2024-01-01"),
@@ -236,8 +242,10 @@ describe("DELETE /invoice/invoice", () => {
 	it("returns 200 on successful deletion", async () => {
 		await loginAsNewUser("inv-delete-200@test.com");
 
-		// Create an invoice to delete
+		// Create an invoice to delete (householdId and storeId are required)
 		const invoice = await new Invoice({
+			householdId: new Types.ObjectId(),
+			storeId: new Types.ObjectId(),
 			storeName: "Doomed Store",
 			storeAddress: "Nowhere Lane",
 			purchaseDate: new Date("2024-02-14"),
