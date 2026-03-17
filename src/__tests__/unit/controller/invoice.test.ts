@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 let mockSave = vi.fn();
 
 vi.mock("../../../models/invoice", () => {
+	const find = vi.fn();
 	const findById = vi.fn();
 	const findByIdAndDelete = vi.fn();
 
@@ -16,6 +17,7 @@ vi.mock("../../../models/invoice", () => {
 		this.save = (...args: any[]) => mockSave(...args);
 	});
 
+	(MockInvoice as any).find = find;
 	(MockInvoice as any).findById = findById;
 	(MockInvoice as any).findByIdAndDelete = findByIdAndDelete;
 
@@ -24,7 +26,7 @@ vi.mock("../../../models/invoice", () => {
 
 import Invoice from "../../../models/invoice";
 import {
-	getInvoice,
+	getInvoices,
 	createInvoice,
 	updateInvoice,
 	deleteInvoice,
@@ -38,21 +40,21 @@ const makeMockRes = () => {
 };
 
 // ---------------------------------------------------------------------------
-// getInvoice
+// getInvoices
 // ---------------------------------------------------------------------------
 
-describe("getInvoice", () => {
+describe("getInvoices", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockSave = vi.fn();
 	});
 
-	it("calls next with 404 when req.user is missing", () => {
-		const req: any = { user: undefined, params: { id: "some-id" } };
+	it("calls next with 404 when req.householdId is missing", () => {
+		const req: any = { householdId: undefined, query: {} };
 		const res = makeMockRes();
 		const next = vi.fn();
 
-		getInvoice(req, res, next);
+		getInvoices(req, res, next);
 
 		expect(next).toHaveBeenCalledWith(
 			expect.objectContaining({ statusCode: 404 }),
@@ -60,63 +62,37 @@ describe("getInvoice", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 400 when id param is missing", () => {
-		const req: any = {
-			user: { _id: "user-1" },
-			params: {},
-		};
+	it("returns 200 with all invoices when no storeId provided", async () => {
+		const mockDocs = [
+			{ _id: "invoice-1", storeName: "Costco", storeAddress: "123 Main St", invoiceItems: [] },
+		];
+		(Invoice.find as any).mockResolvedValue(mockDocs);
+
+		const req: any = { householdId: "household-1", query: {} };
 		const res = makeMockRes();
 		const next = vi.fn();
 
-		getInvoice(req, res, next);
-
-		expect(next).toHaveBeenCalledWith(
-			expect.objectContaining({ statusCode: 400 }),
-		);
-		expect(res.status).not.toHaveBeenCalled();
-	});
-
-	it("calls next with 404 when Invoice.findById returns null", async () => {
-		(Invoice.findById as any).mockResolvedValue(null);
-
-		const req: any = {
-			user: { _id: "user-1" },
-			params: { id: "nonexistent-id" },
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		getInvoice(req, res, next);
-
-		await vi.waitFor(() =>
-			expect(next).toHaveBeenCalledWith(
-				expect.objectContaining({ statusCode: 404 }),
-			),
-		);
-		expect(res.status).not.toHaveBeenCalled();
-	});
-
-	it("returns 200 with invoice on success", async () => {
-		const mockDoc = {
-			_id: "invoice-1",
-			storeName: "Costco",
-			storeAddress: "123 Main St",
-			purchaseDate: new Date("2024-01-01"),
-			invoiceItems: [],
-		};
-		(Invoice.findById as any).mockResolvedValue(mockDoc);
-
-		const req: any = {
-			user: { _id: "user-1" },
-			params: { id: "invoice-1" },
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		getInvoice(req, res, next);
+		getInvoices(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({ invoice: mockDoc });
+		expect(res.json).toHaveBeenCalledWith({ invoices: mockDocs });
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it("returns 200 with filtered invoices when storeId provided", async () => {
+		const mockDocs = [
+			{ _id: "invoice-2", storeName: "Target", storeAddress: "456 Oak Ave", invoiceItems: [] },
+		];
+		(Invoice.find as any).mockResolvedValue(mockDocs);
+
+		const req: any = { householdId: "household-1", query: { storeId: "store-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getInvoices(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		expect(res.json).toHaveBeenCalledWith({ invoices: mockDocs });
 		expect(next).not.toHaveBeenCalled();
 	});
 });

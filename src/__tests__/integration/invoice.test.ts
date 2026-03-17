@@ -43,36 +43,36 @@ async function loginAsNewUser(email: string, password = "password123") {
 }
 
 // ---------------------------------------------------------------------------
-// GET /invoice/invoice/:id
+// GET /invoice/invoice
 // ---------------------------------------------------------------------------
 
-describe("GET /invoice/invoice/:id", () => {
+describe("GET /invoice/invoice", () => {
 	it("returns 401 when not authenticated", async () => {
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
 		const csrf = await getCsrf();
 		const res = await agent
-			.get(`/invoice/invoice/${fakeId}`)
+			.get("/invoice/invoice")
 			.set("x-csrf-token", csrf);
 		expect(res.status).toBe(401);
 	});
 
-	it("returns 404 for a non-existent invoice id", async () => {
-		await loginAsNewUser("inv-get-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+	it("returns 200 with invoices array when authenticated", async () => {
+		await loginAsNewUser("inv-get-200@test.com");
 		const csrf = await getCsrf();
 		const res = await agent
-			.get(`/invoice/invoice/${fakeId}`)
+			.get("/invoice/invoice")
 			.set("x-csrf-token", csrf);
-		expect(res.status).toBe(404);
+
+		expect(res.status).toBe(200);
+		expect(Array.isArray(res.body.invoices)).toBe(true);
 	});
 
-	it("returns 200 with invoice shape for a valid id", async () => {
-		await loginAsNewUser("inv-get-200@test.com");
+	it("returns 200 filtered by storeId", async () => {
+		await loginAsNewUser("inv-get-filter@test.com");
+		const storeId = new Types.ObjectId();
 
-		// Create an invoice directly in DB (householdId and storeId are required)
-		const invoice = await new Invoice({
+		await new Invoice({
 			householdId: new Types.ObjectId(),
-			storeId: new Types.ObjectId(),
+			storeId,
 			storeName: "Grocery World",
 			storeAddress: "42 Market St",
 			purchaseDate: new Date("2024-05-10"),
@@ -81,13 +81,11 @@ describe("GET /invoice/invoice/:id", () => {
 
 		const csrf = await getCsrf();
 		const res = await agent
-			.get(`/invoice/invoice/${invoice._id.toHexString()}`)
+			.get(`/invoice/invoice?storeId=${storeId.toHexString()}`)
 			.set("x-csrf-token", csrf);
 
 		expect(res.status).toBe(200);
-		expect(res.body.invoice).toBeDefined();
-		expect(res.body.invoice.storeName).toBe("Grocery World");
-		expect(res.body.invoice.storeAddress).toBe("42 Market St");
+		expect(Array.isArray(res.body.invoices)).toBe(true);
 	});
 });
 
