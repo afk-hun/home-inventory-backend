@@ -1989,6 +1989,161 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "recipe",
+      "item": [
+        {
+          "name": "recipeType",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipe-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipe-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "recipeType",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test Recipe Type\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipe-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipe-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "recipeType",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"recipeTypeId\": \"69b07da0fa481ce2553f1cb2\",\n    \"name\": \"Renamed recipe type\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipe-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipe-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "recipeType",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"recipeTypeId\": \"69b07da0fa481ce2553f1cb2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipe-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipe-type"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "event": [
