@@ -2142,6 +2142,191 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "recipe",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipes",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "recipe by id",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipes/:id",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "recipe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Pasta\",\n    \"type\": \"Italian\",\n    \"ingredients\": [\n        {\n            \"quantity\": 2,\n            \"unit\": \"cup\",\n            \"item\": \"69a88412a14a788a709ade29\"\n        }\n    ],\n    \"portion\": 4,\n    \"description\": \"A delicious pasta dish\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipes",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "recipe",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"recipeId\": \"69b07da0fa481ce2553f1cb2\",\n    \"name\": \"Updated Pasta\",\n    \"portion\": 6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipes",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "recipe",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"recipeId\": \"69b07da0fa481ce2553f1cb2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipes",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipes"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }

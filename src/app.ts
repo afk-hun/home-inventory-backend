@@ -9,6 +9,7 @@ import invoiceRoutes from "./routes/invoice";
 import invoiceItemRoutes from "./routes/invoiceItem";
 import storeRoutes from "./routes/store";
 import recipeTypeRoutes from "./routes/recipeType";
+import recipeRoutes from "./routes/recipe";
 
 const app = express();
 
@@ -99,6 +100,7 @@ app.use("/invoice", invoiceRoutes);
 app.use("/invoice-item", invoiceItemRoutes);
 app.use("/store", storeRoutes);
 app.use("/recipe", recipeTypeRoutes);
+app.use("/recipe/recipes", recipeRoutes);
 
 app.get("/health", (_req, res) => {
 	res.json({ status: "ok" });
