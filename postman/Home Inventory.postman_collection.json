@@ -2477,6 +2477,179 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "cookingSchedule",
+      "item": [
+        {
+          "name": "getSchedules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_domain}}/cooking-schedule",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "cooking-schedule"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getSchedule",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_domain}}/cooking-schedule/<schedule_id>",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "cooking-schedule",
+                "<schedule_id>"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "createSchedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"March 2026\",\n    \"start\": \"2026-03-01T00:00:00.000Z\",\n    \"end\": \"2026-03-31T23:59:59.000Z\",\n    \"meals\": [\n        {\n            \"start\": \"2026-03-01T07:00:00.000Z\",\n            \"end\": \"2026-03-01T08:00:00.000Z\",\n            \"mealType\": \"Breakfast\",\n            \"recipe\": \"<recipe_id>\",\n            \"portion\": 2\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/cooking-schedule",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "cooking-schedule"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "updateSchedule",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"scheduleId\": \"<schedule_id>\",\n    \"name\": \"April 2026\",\n    \"start\": \"2026-04-01T00:00:00.000Z\",\n    \"end\": \"2026-04-30T23:59:59.000Z\",\n    \"meals\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/cooking-schedule",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "cooking-schedule"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "deleteSchedule",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"scheduleId\": \"<schedule_id>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/cooking-schedule",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "cooking-schedule"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "event": [
