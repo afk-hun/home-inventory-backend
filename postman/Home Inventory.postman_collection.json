@@ -2329,6 +2329,154 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "mealType",
+      "item": [
+        {
+          "name": "getMealTypes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_domain}}/meal/meal-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "meal",
+                "meal-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "createMealType",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Breakfast\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/meal/meal-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "meal",
+                "meal-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "renameMealType",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mealTypeId\": \"<meal_type_id>\",\n    \"name\": \"Lunch\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/meal/meal-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "meal",
+                "meal-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "deleteMealType",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mealTypeId\": \"<meal_type_id>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/meal/meal-type",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "meal",
+                "meal-type"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "event": [
