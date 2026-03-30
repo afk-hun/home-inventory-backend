@@ -2650,6 +2650,154 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "shopping-list",
+      "item": [
+        {
+          "name": "getShoppingLists",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_domain}}/shopping-list/shopping-list",
+              "host": ["{{api_domain}}"],
+              "path": ["shopping-list", "shopping-list"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getShoppingList",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_domain}}/shopping-list/shopping-list/:shoppingListId",
+              "host": ["{{api_domain}}"],
+              "path": ["shopping-list", "shopping-list", ":shoppingListId"],
+              "variable": [
+                {
+                  "key": "shoppingListId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "createShoppingList",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Weekly Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Milk\",\n            \"quantity\": 2,\n            \"unit\": \"liter\"\n        },\n        {\n            \"itemName\": \"Bread\",\n            \"quantity\": 1,\n            \"unit\": \"pcs\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shopping-list/shopping-list",
+              "host": ["{{api_domain}}"],
+              "path": ["shopping-list", "shopping-list"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "updateShoppingList",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shoppingListId\": \"\",\n    \"name\": \"Updated Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Eggs\",\n            \"quantity\": 12,\n            \"unit\": \"pcs\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shopping-list/shopping-list",
+              "host": ["{{api_domain}}"],
+              "path": ["shopping-list", "shopping-list"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "deleteShoppingList",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shoppingListId\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_domain}}/shopping-list/shopping-list",
+              "host": ["{{api_domain}}"],
+              "path": ["shopping-list", "shopping-list"]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "event": [
