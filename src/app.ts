@@ -12,6 +12,7 @@ import recipeTypeRoutes from "./routes/recipeType";
 import recipeRoutes from "./routes/recipe";
 import mealTypeRoutes from "./routes/mealType";
 import cookingScheduleRoutes from "./routes/cookingSchedule";
+import shoppingListRoutes from "./routes/shoppingList";
 
 const app = express();
 
@@ -105,6 +106,7 @@ app.use("/recipe", recipeTypeRoutes);
 app.use("/recipe/recipes", recipeRoutes);
 app.use("/meal", mealTypeRoutes);
 app.use("/cooking-schedule", cookingScheduleRoutes);
+app.use("/shopping-list", shoppingListRoutes);
 
 app.get("/health", (_req, res) => {
 	res.json({ status: "ok" });
