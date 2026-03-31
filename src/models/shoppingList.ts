@@ -4,6 +4,7 @@ export interface IShoppingListItem {
 	itemName: string;
 	quantity: number;
 	unit: string;
+	checked: boolean;
 }
 
 export interface IShoppingList extends Document {
@@ -19,6 +20,7 @@ const shoppingListItemSchema = new mongoose.Schema<IShoppingListItem>(
 		itemName: { type: String, required: true },
 		quantity: { type: Number, required: true },
 		unit: { type: String, required: true },
+		checked: { type: Boolean, required: true, default: false },
 	},
 	{ _id: false },
 );
