@@ -21,10 +21,17 @@ vi.mock("../../../models/recipe", () => {
 	return { default: MockRecipe };
 });
 
+vi.mock("../../../models/shelf", () => {
+	const find = vi.fn();
+	return { default: { find } };
+});
+
 import Recipe from "../../../models/recipe";
+import Shelf from "../../../models/shelf";
 import {
 	getRecipes,
 	getRecipe,
+	getMissingIngredients,
 	createRecipe,
 	updateRecipe,
 	deleteRecipe,
@@ -582,5 +589,293 @@ describe("deleteRecipe", () => {
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
 		expect(Recipe.findByIdAndDelete).toHaveBeenCalledWith("r-99");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getMissingIngredients
+// ---------------------------------------------------------------------------
+
+describe("getMissingIngredients", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockSave = vi.fn();
+	});
+
+	it("calls next with 404 when req.user is missing", () => {
+		const req: any = { user: undefined, householdId: "hh-1", params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		expect(next).toHaveBeenCalledWith(
+			expect.objectContaining({ statusCode: 404 }),
+		);
+		expect(res.status).not.toHaveBeenCalled();
+	});
+
+	it("calls next with 404 when householdId is missing", () => {
+		const req: any = { user: { _id: "user-1" }, householdId: undefined, params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		expect(next).toHaveBeenCalledWith(
+			expect.objectContaining({ statusCode: 404 }),
+		);
+		expect(res.status).not.toHaveBeenCalled();
+	});
+
+	it("calls next with 404 when recipe is not found", async () => {
+		const mockFindById = {
+			populate: vi.fn().mockResolvedValue(null),
+		};
+		(Recipe.findById as any).mockReturnValue(mockFindById);
+
+		const req: any = { user: { _id: "user-1" }, householdId: "hh-1", params: { id: "nonexistent-id" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		await vi.waitFor(() =>
+			expect(next).toHaveBeenCalledWith(
+				expect.objectContaining({ statusCode: 404 }),
+			),
+		);
+		expect(res.status).not.toHaveBeenCalled();
+	});
+
+	it("calls next with 500 when Recipe.findById rejects", async () => {
+		const mockFindById = {
+			populate: vi.fn().mockRejectedValue(new Error("DB error")),
+		};
+		(Recipe.findById as any).mockReturnValue(mockFindById);
+
+		const req: any = { user: { _id: "user-1" }, householdId: "hh-1", params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		await vi.waitFor(() =>
+			expect(next).toHaveBeenCalledWith(
+				expect.objectContaining({ statusCode: 500 }),
+			),
+		);
+		expect(res.status).not.toHaveBeenCalled();
+	});
+
+	it("returns 200 with empty array when all ingredients are sufficiently stocked", async () => {
+		const itemId = "item-1";
+		const mockRecipe = {
+			ingredients: [
+				{ item: { _id: itemId, name: "Flour" }, quantity: 200, unit: "g" },
+			],
+		};
+		const mockFindById = {
+			populate: vi.fn().mockResolvedValue(mockRecipe),
+		};
+		(Recipe.findById as any).mockReturnValue(mockFindById);
+		(Shelf.find as any).mockResolvedValue([
+			{
+				items: [
+					{ item: { toString: () => itemId }, quantity: 500, unit: "g" },
+				],
+			},
+		]);
+
+		const req: any = { user: { _id: "user-1" }, householdId: "hh-1", params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		expect(res.json).toHaveBeenCalledWith([]);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it("returns missing ingredient when shelf quantity is insufficient", async () => {
+		const itemId = "item-2";
+		const mockRecipe = {
+			ingredients: [
+				{ item: { _id: itemId, name: "Sugar" }, quantity: 300, unit: "g" },
+			],
+		};
+		const mockFindById = {
+			populate: vi.fn().mockResolvedValue(mockRecipe),
+		};
+		(Recipe.findById as any).mockReturnValue(mockFindById);
+		(Shelf.find as any).mockResolvedValue([
+			{
+				items: [
+					{ item: { toString: () => itemId }, quantity: 100, unit: "g" },
+				],
+			},
+		]);
+
+		const req: any = { user: { _id: "user-1" }, householdId: "hh-1", params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		expect(res.json).toHaveBeenCalledWith([
+			{ item: { _id: itemId, name: "Sugar" }, amount: 300, unit: "g" },
+		]);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it("returns missing ingredient when item is not on any shelf", async () => {
+		const itemId = "item-3";
+		const mockRecipe = {
+			ingredients: [
+				{ item: { _id: itemId, name: "Salt" }, quantity: 50, unit: "g" },
+			],
+		};
+		const mockFindById = {
+			populate: vi.fn().mockResolvedValue(mockRecipe),
+		};
+		(Recipe.findById as any).mockReturnValue(mockFindById);
+		(Shelf.find as any).mockResolvedValue([]);
+
+		const req: any = { user: { _id: "user-1" }, householdId: "hh-1", params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		expect(res.json).toHaveBeenCalledWith([
+			{ item: { _id: itemId, name: "Salt" }, amount: 50, unit: "g" },
+		]);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it("treats shelf quantity as 0 when units differ (case-insensitive mismatch)", async () => {
+		const itemId = "item-4";
+		const mockRecipe = {
+			ingredients: [
+				{ item: { _id: itemId, name: "Milk" }, quantity: 2, unit: "L" },
+			],
+		};
+		const mockFindById = {
+			populate: vi.fn().mockResolvedValue(mockRecipe),
+		};
+		(Recipe.findById as any).mockReturnValue(mockFindById);
+		(Shelf.find as any).mockResolvedValue([
+			{
+				items: [
+					// shelf has ml, recipe needs L — different units → treat as 0
+					{ item: { toString: () => itemId }, quantity: 5000, unit: "ml" },
+				],
+			},
+		]);
+
+		const req: any = { user: { _id: "user-1" }, householdId: "hh-1", params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		expect(res.json).toHaveBeenCalledWith([
+			{ item: { _id: itemId, name: "Milk" }, amount: 2, unit: "L" },
+		]);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it("matches units case-insensitively (shelf 'G' matches recipe 'g')", async () => {
+		const itemId = "item-5";
+		const mockRecipe = {
+			ingredients: [
+				{ item: { _id: itemId, name: "Pepper" }, quantity: 10, unit: "g" },
+			],
+		};
+		const mockFindById = {
+			populate: vi.fn().mockResolvedValue(mockRecipe),
+		};
+		(Recipe.findById as any).mockReturnValue(mockFindById);
+		(Shelf.find as any).mockResolvedValue([
+			{
+				items: [
+					{ item: { toString: () => itemId }, quantity: 50, unit: "G" },
+				],
+			},
+		]);
+
+		const req: any = { user: { _id: "user-1" }, householdId: "hh-1", params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		// 50G on shelf >= 10g required → not missing
+		expect(res.json).toHaveBeenCalledWith([]);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it("returns full required amount (not the difference) when partially stocked", async () => {
+		const itemId = "item-6";
+		const mockRecipe = {
+			ingredients: [
+				{ item: { _id: itemId, name: "Butter" }, quantity: 400, unit: "g" },
+			],
+		};
+		const mockFindById = {
+			populate: vi.fn().mockResolvedValue(mockRecipe),
+		};
+		(Recipe.findById as any).mockReturnValue(mockFindById);
+		(Shelf.find as any).mockResolvedValue([
+			{
+				items: [
+					{ item: { toString: () => itemId }, quantity: 150, unit: "g" },
+				],
+			},
+		]);
+
+		const req: any = { user: { _id: "user-1" }, householdId: "hh-1", params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		// Returns full 400, not 250 (the difference)
+		expect(res.json).toHaveBeenCalledWith([
+			{ item: { _id: itemId, name: "Butter" }, amount: 400, unit: "g" },
+		]);
+	});
+
+	it("sums quantities across multiple shelves for the same item and unit", async () => {
+		const itemId = "item-7";
+		const mockRecipe = {
+			ingredients: [
+				{ item: { _id: itemId, name: "Rice" }, quantity: 500, unit: "g" },
+			],
+		};
+		const mockFindById = {
+			populate: vi.fn().mockResolvedValue(mockRecipe),
+		};
+		(Recipe.findById as any).mockReturnValue(mockFindById);
+		// Two shelves each with 300g → total 600g >= 500g
+		(Shelf.find as any).mockResolvedValue([
+			{ items: [{ item: { toString: () => itemId }, quantity: 300, unit: "g" }] },
+			{ items: [{ item: { toString: () => itemId }, quantity: 300, unit: "g" }] },
+		]);
+
+		const req: any = { user: { _id: "user-1" }, householdId: "hh-1", params: { id: "r-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		getMissingIngredients(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		expect(res.json).toHaveBeenCalledWith([]);
 	});
 });

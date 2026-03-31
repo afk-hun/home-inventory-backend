@@ -5,6 +5,8 @@ import mongoose from "mongoose";
 import app from "../../app";
 import User from "../../models/user";
 import Household from "../../models/household";
+import Item from "../../models/item";
+import Shelf from "../../models/shelf";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -39,6 +41,30 @@ async function loginAsNewUser(email: string, password = "password123") {
 		.send({ email, password });
 
 	return user;
+}
+
+/** Creates a user + household in DB, logs in via HTTP, returns both user and household. */
+async function loginAsNewUserWithHousehold(email: string, password = "password123") {
+	const hashed = await bcrypt.hash(password, 1);
+	const user = await new User({
+		name: "Recipe Test User",
+		email,
+		password: hashed,
+	}).save();
+
+	const household = await new Household({
+		name: "Recipe Test Household",
+		owner: user,
+		members: [user],
+	}).save();
+
+	const csrf = await getCsrf();
+	await agent
+		.post("/auth/login")
+		.set("x-csrf-token", csrf)
+		.send({ email, password });
+
+	return { user, household };
 }
 
 // ---------------------------------------------------------------------------
@@ -366,5 +392,220 @@ describe("DELETE /recipe/recipes", () => {
 			.set("x-csrf-token", getCsrfToken);
 
 		expect(getRes.status).toBe(404);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// GET /recipe/recipes/:id/missing-ingredients
+// ---------------------------------------------------------------------------
+
+describe("GET /recipe/recipes/:id/missing-ingredients", () => {
+	it("returns 401 when not authenticated", async () => {
+		const csrf = await getCsrf();
+		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const res = await agent
+			.get(`/recipe/recipes/${fakeId}/missing-ingredients`)
+			.set("x-csrf-token", csrf);
+		expect(res.status).toBe(401);
+	});
+
+	it("returns 404 for a non-existent recipe id", async () => {
+		await loginAsNewUser("rec-missing-404@test.com");
+		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const csrf = await getCsrf();
+		const res = await agent
+			.get(`/recipe/recipes/${fakeId}/missing-ingredients`)
+			.set("x-csrf-token", csrf);
+		expect(res.status).toBe(404);
+	});
+
+	it("returns 200 with all ingredients missing when shelves are empty", async () => {
+		const { household } = await loginAsNewUserWithHousehold("rec-missing-all@test.com");
+
+		// Create an item directly in DB
+		const item = await new Item({
+			householdId: household._id,
+			name: "Flour",
+			connectedStores: [],
+		}).save();
+
+		// Create a recipe with one ingredient
+		const createCsrf = await getCsrf();
+		const createRes = await agent
+			.post("/recipe/recipes")
+			.set("x-csrf-token", createCsrf)
+			.send({
+				name: "Bread",
+				ingredients: [{ quantity: 500, unit: "g", item: item._id.toString() }],
+			});
+		expect(createRes.status).toBe(201);
+		const recipeId = createRes.body.recipe._id;
+
+		const csrf = await getCsrf();
+		const res = await agent
+			.get(`/recipe/recipes/${recipeId}/missing-ingredients`)
+			.set("x-csrf-token", csrf);
+
+		expect(res.status).toBe(200);
+		expect(Array.isArray(res.body)).toBe(true);
+		expect(res.body).toHaveLength(1);
+		expect(res.body[0].amount).toBe(500);
+		expect(res.body[0].unit).toBe("g");
+		expect(res.body[0].item._id).toBe(item._id.toString());
+		expect(res.body[0].item.name).toBe("Flour");
+	});
+
+	it("returns 200 with empty array when all ingredients are sufficiently stocked", async () => {
+		const { household } = await loginAsNewUserWithHousehold("rec-missing-none@test.com");
+
+		const item = await new Item({
+			householdId: household._id,
+			name: "Sugar",
+			connectedStores: [],
+		}).save();
+
+		// Create a shelf with enough quantity
+		await new Shelf({
+			householdId: household._id,
+			name: "Pantry",
+			items: [{ item: item._id, quantity: 1000, unit: "g" }],
+		}).save();
+
+		const createCsrf = await getCsrf();
+		const createRes = await agent
+			.post("/recipe/recipes")
+			.set("x-csrf-token", createCsrf)
+			.send({
+				name: "Cake",
+				ingredients: [{ quantity: 200, unit: "g", item: item._id.toString() }],
+			});
+		expect(createRes.status).toBe(201);
+		const recipeId = createRes.body.recipe._id;
+
+		const csrf = await getCsrf();
+		const res = await agent
+			.get(`/recipe/recipes/${recipeId}/missing-ingredients`)
+			.set("x-csrf-token", csrf);
+
+		expect(res.status).toBe(200);
+		expect(Array.isArray(res.body)).toBe(true);
+		expect(res.body).toHaveLength(0);
+	});
+
+	it("returns full required amount (not the difference) when partially stocked", async () => {
+		const { household } = await loginAsNewUserWithHousehold("rec-missing-partial@test.com");
+
+		const item = await new Item({
+			householdId: household._id,
+			name: "Butter",
+			connectedStores: [],
+		}).save();
+
+		await new Shelf({
+			householdId: household._id,
+			name: "Fridge",
+			items: [{ item: item._id, quantity: 100, unit: "g" }],
+		}).save();
+
+		const createCsrf = await getCsrf();
+		const createRes = await agent
+			.post("/recipe/recipes")
+			.set("x-csrf-token", createCsrf)
+			.send({
+				name: "Cookies",
+				ingredients: [{ quantity: 400, unit: "g", item: item._id.toString() }],
+			});
+		expect(createRes.status).toBe(201);
+		const recipeId = createRes.body.recipe._id;
+
+		const csrf = await getCsrf();
+		const res = await agent
+			.get(`/recipe/recipes/${recipeId}/missing-ingredients`)
+			.set("x-csrf-token", csrf);
+
+		expect(res.status).toBe(200);
+		expect(res.body).toHaveLength(1);
+		// Returns full required amount, not the difference (300)
+		expect(res.body[0].amount).toBe(400);
+	});
+
+	it("treats shelf quantity as 0 when units differ", async () => {
+		const { household } = await loginAsNewUserWithHousehold("rec-missing-unit@test.com");
+
+		const item = await new Item({
+			householdId: household._id,
+			name: "Milk",
+			connectedStores: [],
+		}).save();
+
+		// Shelf has ml, recipe needs L
+		await new Shelf({
+			householdId: household._id,
+			name: "Fridge",
+			items: [{ item: item._id, quantity: 5000, unit: "ml" }],
+		}).save();
+
+		const createCsrf = await getCsrf();
+		const createRes = await agent
+			.post("/recipe/recipes")
+			.set("x-csrf-token", createCsrf)
+			.send({
+				name: "Smoothie",
+				ingredients: [{ quantity: 2, unit: "L", item: item._id.toString() }],
+			});
+		expect(createRes.status).toBe(201);
+		const recipeId = createRes.body.recipe._id;
+
+		const csrf = await getCsrf();
+		const res = await agent
+			.get(`/recipe/recipes/${recipeId}/missing-ingredients`)
+			.set("x-csrf-token", csrf);
+
+		expect(res.status).toBe(200);
+		expect(res.body).toHaveLength(1);
+		expect(res.body[0].amount).toBe(2);
+		expect(res.body[0].unit).toBe("L");
+	});
+
+	it("sums quantities across multiple shelves for the same item and unit", async () => {
+		const { household } = await loginAsNewUserWithHousehold("rec-missing-multishelf@test.com");
+
+		const item = await new Item({
+			householdId: household._id,
+			name: "Rice",
+			connectedStores: [],
+		}).save();
+
+		// Two shelves each with 300g → total 600g
+		await new Shelf({
+			householdId: household._id,
+			name: "Shelf A",
+			items: [{ item: item._id, quantity: 300, unit: "g" }],
+		}).save();
+		await new Shelf({
+			householdId: household._id,
+			name: "Shelf B",
+			items: [{ item: item._id, quantity: 300, unit: "g" }],
+		}).save();
+
+		const createCsrf = await getCsrf();
+		const createRes = await agent
+			.post("/recipe/recipes")
+			.set("x-csrf-token", createCsrf)
+			.send({
+				name: "Rice Pudding",
+				// Needs 500g — shelf total is 600g → sufficient
+				ingredients: [{ quantity: 500, unit: "g", item: item._id.toString() }],
+			});
+		expect(createRes.status).toBe(201);
+		const recipeId = createRes.body.recipe._id;
+
+		const csrf = await getCsrf();
+		const res = await agent
+			.get(`/recipe/recipes/${recipeId}/missing-ingredients`)
+			.set("x-csrf-token", csrf);
+
+		expect(res.status).toBe(200);
+		expect(res.body).toHaveLength(0);
 	});
 });
