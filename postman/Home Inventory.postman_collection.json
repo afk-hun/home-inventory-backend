@@ -2716,7 +2716,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Weekly Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Milk\",\n            \"quantity\": 2,\n            \"unit\": \"liter\"\n        },\n        {\n            \"itemName\": \"Bread\",\n            \"quantity\": 1,\n            \"unit\": \"pcs\"\n        }\n    ]\n}",
+              "raw": "{\n    \"name\": \"Weekly Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Milk\",\n            \"quantity\": 2,\n            \"unit\": \"liter\",\n            \"checked\": false\n        },\n        {\n            \"itemName\": \"Bread\",\n            \"quantity\": 1,\n            \"unit\": \"pcs\",\n            \"checked\": false\n        }\n    ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2749,7 +2749,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"shoppingListId\": \"\",\n    \"name\": \"Updated Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Eggs\",\n            \"quantity\": 12,\n            \"unit\": \"pcs\"\n        }\n    ]\n}",
+              "raw": "{\n    \"shoppingListId\": \"\",\n    \"name\": \"Updated Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Eggs\",\n            \"quantity\": 12,\n            \"unit\": \"pcs\",\n            \"checked\": false\n        }\n    ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
