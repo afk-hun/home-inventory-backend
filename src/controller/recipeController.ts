@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 
 import { prisma } from "../lib/prisma";
 import { toMongoDoc } from "../lib/serialize";
+import { toBase } from "../lib/units";
 
 export const getRecipes = (
 	req: Request,
@@ -143,11 +144,16 @@ export const createRecipe = (
 				portion,
 				description,
 				ingredients: {
-					create: ingList.map((ing: any) => ({
-						itemId: ing.item,
-						quantity: ing.quantity,
-						unit: ing.unit,
-					})),
+					create: ingList.map((ing: any) => {
+						const { baseQuantity, baseUnit } = toBase(ing.quantity, ing.unit);
+						return {
+							itemId: ing.item,
+							quantity: ing.quantity,
+							unit: ing.unit,
+							...(baseQuantity !== null && { baseQuantity }),
+							...(baseUnit !== null && { baseUnit }),
+						};
+					}),
 				},
 			},
 			include: { ingredients: true },
@@ -220,11 +226,16 @@ export const updateRecipe = (
 						data: {
 							...updateData,
 							ingredients: {
-								create: (ingredients as any[]).map((ing: any) => ({
-									itemId: ing.item,
-									quantity: ing.quantity,
-									unit: ing.unit,
-								})),
+								create: (ingredients as any[]).map((ing: any) => {
+									const { baseQuantity, baseUnit } = toBase(ing.quantity, ing.unit);
+									return {
+										itemId: ing.item,
+										quantity: ing.quantity,
+										unit: ing.unit,
+										...(baseQuantity !== null && { baseQuantity }),
+										...(baseUnit !== null && { baseUnit }),
+									};
+								}),
 							},
 						},
 						include: { ingredients: true },
@@ -302,33 +313,60 @@ export const getMissingIngredients = (
 			});
 		})
 		.then((shelfItems) => {
-			// Build a map: itemId -> { [unit_lower]: totalQuantity }
-			const shelfTotals = new Map<string, Map<string, number>>();
+			// Build two maps per itemId:
+			//   baseMap: baseUnit -> total baseQuantity (for cross-unit comparison)
+			//   exactMap: unit_lower -> total quantity (fallback for exact-unit match)
+			const shelfBase = new Map<string, Map<string, number>>();
+			const shelfExact = new Map<string, Map<string, number>>();
 
 			for (const si of shelfItems) {
 				const itemId = si.itemId;
-				const unit = (si.unit || "").toLowerCase();
-				if (!shelfTotals.has(itemId)) {
-					shelfTotals.set(itemId, new Map());
+
+				// Base-unit map
+				if (si.baseUnit && si.baseQuantity !== null && si.baseQuantity !== undefined) {
+					if (!shelfBase.has(itemId)) shelfBase.set(itemId, new Map());
+					const bm = shelfBase.get(itemId)!;
+					bm.set(si.baseUnit, (bm.get(si.baseUnit) || 0) + si.baseQuantity);
 				}
-				const unitMap = shelfTotals.get(itemId)!;
-				unitMap.set(unit, (unitMap.get(unit) || 0) + si.quantity);
+
+				// Exact-unit map (fallback for old records without baseQuantity)
+				const unit = (si.unit || "").toLowerCase();
+				if (!shelfExact.has(itemId)) shelfExact.set(itemId, new Map());
+				const em = shelfExact.get(itemId)!;
+				em.set(unit, (em.get(unit) || 0) + si.quantity);
 			}
 
 			const missing: { item: { _id: string; name: any }; amount: number; unit: string }[] = [];
 
 			for (const ingredient of foundRecipe.ingredients) {
 				const itemId = ingredient.item.id;
-				const requiredUnit = ingredient.unit.toLowerCase();
 				const requiredAmount = ingredient.quantity;
 
-				const unitMap = shelfTotals.get(itemId);
-				const shelfAmount = unitMap ? (unitMap.get(requiredUnit) || 0) : 0;
-
-				if (shelfAmount < requiredAmount) {
+				// Prefer base-unit comparison when both sides have it
+				if (
+					ingredient.baseUnit &&
+					ingredient.baseQuantity !== null &&
+					ingredient.baseQuantity !== undefined
+				) {
+					const bm = shelfBase.get(itemId);
+					const shelfBaseAmount = bm ? (bm.get(ingredient.baseUnit) || 0) : 0;
+					const needed = (ingredient.baseQuantity as number) - shelfBaseAmount;
+					if (needed <= 0) continue;
 					missing.push({
 						item: { _id: ingredient.item.id, name: ingredient.item.name },
-						amount: requiredAmount,
+						amount: needed,
+						unit: ingredient.baseUnit,
+					});
+				} else {
+					// Fallback: exact unit string match
+					const requiredUnit = ingredient.unit.toLowerCase();
+					const em = shelfExact.get(itemId);
+					const shelfAmount = em ? (em.get(requiredUnit) || 0) : 0;
+					const needed = requiredAmount - shelfAmount;
+					if (needed <= 0) continue;
+					missing.push({
+						item: { _id: ingredient.item.id, name: ingredient.item.name },
+						amount: needed,
 						unit: ingredient.unit,
 					});
 				}

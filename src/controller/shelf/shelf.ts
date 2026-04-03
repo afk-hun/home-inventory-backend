@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 
 import { prisma } from "../../lib/prisma";
 import { toMongoDoc } from "../../lib/serialize";
+import { toBase } from "../../lib/units";
 
 export const getShelves = (
 	req: Request,
@@ -242,6 +243,10 @@ export const addShelfItem = (
 				throw error;
 			}
 
+			const { baseQuantity, baseUnit } = unit !== undefined
+				? toBase(quantity, unit)
+				: { baseQuantity: null, baseUnit: null };
+
 			return prisma.shelfItem
 				.create({
 					data: {
@@ -250,6 +255,8 @@ export const addShelfItem = (
 						quantity,
 						...(itemName !== undefined && { itemName }),
 						...(unit !== undefined && { unit }),
+						...(baseQuantity !== null && { baseQuantity }),
+						...(baseUnit !== null && { baseUnit }),
 					},
 				})
 				.then(() => {

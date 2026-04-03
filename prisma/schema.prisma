@@ -107,14 +107,16 @@ model Shelf {
 }
 
 model ShelfItem {
-  id       String  @id @default(cuid())
-  shelfId  String
-  shelf    Shelf   @relation(fields: [shelfId], references: [id], onDelete: Cascade)
-  itemId   String
-  item     Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  itemName String?
-  quantity Float
-  unit     String?
+  id           String  @id @default(cuid())
+  shelfId      String
+  shelf        Shelf   @relation(fields: [shelfId], references: [id], onDelete: Cascade)
+  itemId       String
+  item         Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemName     String?
+  quantity     Float
+  unit         String?
+  baseQuantity Float?
+  baseUnit     String?
 }
 
 model Store {
@@ -190,13 +192,15 @@ model Recipe {
 }
 
 model Ingredient {
-  id       String @id @default(cuid())
-  recipeId String
-  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  itemId   String
-  item     Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  quantity Float
-  unit     String
+  id           String @id @default(cuid())
+  recipeId     String
+  recipe       Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  itemId       String
+  item         Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity     Float
+  unit         String
+  baseQuantity Float?
+  baseUnit     String?
 }
 
 model UnitType {
@@ -254,5 +258,7 @@ model ShoppingListItem {
   itemName       String
   quantity       Float
   unit           String
+  baseQuantity   Float?
+  baseUnit       String?
   checked        Boolean      @default(false)
 }

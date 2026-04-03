@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 
 import { prisma } from "../lib/prisma";
 import { toMongoDoc } from "../lib/serialize";
+import { toBase } from "../lib/units";
 
 export const getShoppingLists = (
 	req: Request,
@@ -117,12 +118,17 @@ export const createShoppingList = (
 				name,
 				storeId,
 				items: {
-					create: itemList.map((item: any) => ({
-						itemName: item.itemName,
-						quantity: item.quantity,
-						unit: item.unit,
-						checked: item.checked ?? false,
-					})),
+					create: itemList.map((item: any) => {
+						const { baseQuantity, baseUnit } = toBase(item.quantity, item.unit);
+						return {
+							itemName: item.itemName,
+							quantity: item.quantity,
+							unit: item.unit,
+							checked: item.checked ?? false,
+							...(baseQuantity !== null && { baseQuantity }),
+							...(baseUnit !== null && { baseUnit }),
+						};
+					}),
 				},
 			},
 			include: { items: true },
@@ -189,12 +195,17 @@ export const updateShoppingList = (
 						data: {
 							...updateData,
 							items: {
-								create: (items as any[]).map((item: any) => ({
-									itemName: item.itemName,
-									quantity: item.quantity,
-									unit: item.unit,
-									checked: item.checked ?? false,
-								})),
+								create: (items as any[]).map((item: any) => {
+									const { baseQuantity, baseUnit } = toBase(item.quantity, item.unit);
+									return {
+										itemName: item.itemName,
+										quantity: item.quantity,
+										unit: item.unit,
+										checked: item.checked ?? false,
+										...(baseQuantity !== null && { baseQuantity }),
+										...(baseUnit !== null && { baseUnit }),
+									};
+								}),
 							},
 						},
 						include: { items: true },
