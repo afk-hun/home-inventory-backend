@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id       String @id @default(cuid())
+  name     String
+  email    String @unique
+  password String
+
+  ownedHouseholds  Household[]       @relation("HouseholdOwner")
+  memberHouseholds HouseholdMember[]
+}
+
+model Household {
+  id      String @id @default(cuid())
+  name    String
+  ownerId String
+  owner   User   @relation("HouseholdOwner", fields: [ownerId], references: [id])
+
+  members         HouseholdMember[]
+  items           Item[]
+  shelves         Shelf[]
+  stores          Store[]
+  invoices        Invoice[]
+  invoiceItems    InvoiceItem[]
+  recipes         Recipe[]
+  schedules       MonthlyCookingSchedule[]
+  shoppingLists   ShoppingList[]
+  itemTypes       ItemType[]
+  shelfTypes      ShelfType[]
+  shelfPlaceTypes ShelfPlaceType[]
+  unitTypes       UnitType[]
+  mealTypes       MealType[]
+  recipeTypes     RecipeType[]
+}
+
+model HouseholdMember {
+  householdId String
+  userId      String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([householdId, userId])
+}
+
+model ItemType {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  items Item[]
+}
+
+model Item {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  typeId      String?
+  type        ItemType? @relation(fields: [typeId], references: [id])
+
+  connectedStores ItemConnectedStore[]
+  shelfItems      ShelfItem[]
+  ingredients     Ingredient[]
+}
+
+model ItemConnectedStore {
+  id            String @id @default(cuid())
+  itemId        String
+  item          Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  storeId       String
+  store         Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeName     String
+  storeItemId   String @default("")
+  storeItemName String @default("")
+}
+
+model ShelfType {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model ShelfPlaceType {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model Shelf {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  place       String?
+  type        String?
+
+  items ShelfItem[]
+}
+
+model ShelfItem {
+  id       String  @id @default(cuid())
+  shelfId  String
+  shelf    Shelf   @relation(fields: [shelfId], references: [id], onDelete: Cascade)
+  itemId   String
+  item     Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemName String?
+  quantity Float
+  unit     String?
+}
+
+model Store {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  connectedItems ItemConnectedStore[]
+  invoices       Invoice[]
+  shoppingLists  ShoppingList[]
+}
+
+model Invoice {
+  id           String    @id @default(cuid())
+  householdId  String
+  household    Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  storeId      String
+  store        Store     @relation(fields: [storeId], references: [id])
+  storeName    String
+  storeAddress String
+  purchaseDate DateTime
+
+  invoiceItems InvoiceElement[]
+}
+
+model InvoiceElement {
+  id               String  @id @default(cuid())
+  invoiceId        String
+  invoice          Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  inStoreId        String
+  inStoreName      String
+  inStorePrice     Float
+  inStoreUnitPrice Float
+  inStoreQuantity  String
+  inStoreUnit      String
+  inStoreTaxType   String
+}
+
+model InvoiceItem {
+  id               String    @id @default(cuid())
+  householdId      String
+  household        Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  storeId          String
+  storeName        String
+  inStoreId        String
+  inStoreName      String
+  inStorePrice     Float
+  inStoreUnitPrice Float
+  inStoreQuantity  String
+  inStoreUnit      String
+  inStoreTaxType   String
+}
+
+model RecipeType {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model Recipe {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  type        String?
+  portion     Float?
+  description String?
+
+  ingredients Ingredient[]
+  meals       Meal[]
+}
+
+model Ingredient {
+  id       String @id @default(cuid())
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  itemId   String
+  item     Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity Float
+  unit     String
+}
+
+model UnitType {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model MealType {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model MonthlyCookingSchedule {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  start       DateTime
+  end         DateTime
+
+  meals Meal[]
+}
+
+model Meal {
+  id         String                 @id @default(cuid())
+  scheduleId String
+  schedule   MonthlyCookingSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  recipeId   String
+  recipe     Recipe                 @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  mealType   String
+  start      DateTime
+  end        DateTime
+  portion    Float
+}
+
+model ShoppingList {
+  id          String    @id @default(cuid())
+  name        String
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id])
+
+  items ShoppingListItem[]
+}
+
+model ShoppingListItem {
+  id             String       @id @default(cuid())
+  shoppingListId String
+  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  itemName       String
+  quantity       Float
+  unit           String
+  checked        Boolean      @default(false)
+}

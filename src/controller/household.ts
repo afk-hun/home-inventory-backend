@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import Household from "../models/household";
+import { prisma } from "../lib/prisma";
+import { toMongoDoc } from "../lib/serialize";
 import { setHouseholdCookie } from "./auth";
 
 export const setHousehold = (
@@ -35,17 +36,18 @@ export const getHouseholds = (
 		return next(error);
 	}
 
-	Household.find({ "owner._id": user._id })
+	prisma.household
+		.findMany({ where: { ownerId: user.id } })
 		.then((households) => {
 			res.status(200).json({
-				households: households.map((household) => ({
-					_id: household._id,
-					name: household.name,
-					members: household.members,
+				households: households.map((h) => ({
+					_id: h.id,
+					name: h.name,
+					members: [],
 				})),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) {
 				err.statusCode = 500;
 			}
@@ -67,21 +69,23 @@ export const createHousehold = async (
 		return next(error);
 	}
 
-	const household = new Household({
-		name,
-		owner: owner,
-		members: [owner],
-	});
-
-	household
-		.save()
+	prisma.household
+		.create({
+			data: {
+				name,
+				ownerId: owner.id,
+				members: {
+					create: [{ userId: owner.id }],
+				},
+			},
+		})
 		.then((result) => {
 			res.status(201).json({
 				message: "Household created!",
-				household: household,
+				household: toMongoDoc(result),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) {
 				err.statusCode = 500;
 			}
@@ -105,23 +109,26 @@ export const renameHousehold = (
 		return next(error);
 	}
 
-	Household.findById(householdId)
+	prisma.household
+		.findUnique({ where: { id: householdId } })
 		.then((household) => {
 			if (!household) {
 				const error = new Error("Household not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			household.name = newName;
-			return household.save();
-		})
-		.then((updatedHousehold) => {
-			res.status(200).json({
-				message: "Household renamed successfully",
-				householdId: updatedHousehold._id,
+			return prisma.household.update({
+				where: { id: householdId },
+				data: { name: newName },
 			});
 		})
-		.catch((err) => {
+		.then((updated) => {
+			res.status(200).json({
+				message: "Household renamed successfully",
+				householdId: updated.id,
+			});
+		})
+		.catch((err: any) => {
 			if (!err.statusCode) {
 				err.statusCode = 500;
 			}
@@ -142,18 +149,22 @@ export const deleteHousehold = (
 		return next(error);
 	}
 
-	Household.findByIdAndDelete(householdId)
-		.then((result) => {
-			if (!result) {
+	prisma.household
+		.findUnique({ where: { id: householdId } })
+		.then((household) => {
+			if (!household) {
 				const error = new Error("Household not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.household.delete({ where: { id: householdId } });
+		})
+		.then(() => {
 			res.status(200).json({
 				message: "Household deleted successfully",
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) {
 				err.statusCode = 500;
 			}

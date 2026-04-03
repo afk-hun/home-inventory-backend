@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import Item from "../../models/item";
-import Store from "../../models/store";
+import { prisma } from "../../lib/prisma";
+import { toMongoDoc } from "../../lib/serialize";
 
 export const getItems = (req: Request, res: Response, next: NextFunction) => {
 	const user = req.user;
@@ -23,22 +23,39 @@ export const getItems = (req: Request, res: Response, next: NextFunction) => {
 	}
 
 	const storeId = req.query.storeId as string | undefined;
-	const filter: Record<string, unknown> = { householdId };
+
+	let whereClause: any = { householdId };
 	if (storeId) {
-		filter.$or = [
-			{ connectedStores: { $size: 0 } },
-			{ "connectedStores.storeId": storeId },
-		];
+		whereClause = {
+			householdId,
+			OR: [
+				{ connectedStores: { none: {} } },
+				{ connectedStores: { some: { storeId } } },
+			],
+		};
 	}
 
-	Item.countDocuments(filter)
+	prisma.item
+		.count({ where: whereClause })
 		.then((total) => {
-			return Item.find(filter)
-				.skip(skip)
-				.limit(limit)
+			return prisma.item
+				.findMany({
+					where: whereClause,
+					skip,
+					take: limit,
+					include: { connectedStores: true },
+				})
 				.then((items) => {
 					res.status(200).json({
-						items,
+						items: items.map((item) => ({
+							...toMongoDoc(item),
+							connectedStores: item.connectedStores.map((cs) => ({
+								storeId: cs.storeId,
+								storeName: cs.storeName,
+								storeItemId: cs.storeItemId,
+								storeItemName: cs.storeItemName,
+							})),
+						})),
 						pagination: {
 							total,
 							page,
@@ -48,7 +65,7 @@ export const getItems = (req: Request, res: Response, next: NextFunction) => {
 					});
 				});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -71,17 +88,34 @@ export const getItem = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	Item.findOne({ _id: id, householdId })
-		.populate("type", "name")
+	prisma.item
+		.findFirst({
+			where: { id, householdId },
+			include: {
+				type: { select: { id: true, name: true } },
+				connectedStores: true,
+			},
+		})
 		.then((item) => {
 			if (!item) {
 				const error = new Error("Item not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			res.status(200).json({ item });
+			res.status(200).json({
+				item: {
+					...toMongoDoc(item),
+					type: item.type ? { _id: item.type.id, name: item.type.name } : null,
+					connectedStores: item.connectedStores.map((cs) => ({
+						storeId: cs.storeId,
+						storeName: cs.storeName,
+						storeItemId: cs.storeItemId,
+						storeItemName: cs.storeItemName,
+					})),
+				},
+			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -110,19 +144,40 @@ export const createItem = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	const item = new Item({
-		householdId,
-		name,
-		...(type !== undefined && { type }),
-		connectedStores: connectedStores || [],
-	});
+	const stores: any[] = connectedStores || [];
 
-	item
-		.save()
-		.then((result) => {
-			res.status(201).json({ message: "Item created!", item: result });
+	prisma.item
+		.create({
+			data: {
+				householdId,
+				name,
+				...(type !== undefined && { typeId: type }),
+				connectedStores: {
+					create: stores.map((cs: any) => ({
+						storeId: cs.storeId,
+						storeName: cs.storeName,
+						storeItemId: cs.storeItemId || "",
+						storeItemName: cs.storeItemName || "",
+					})),
+				},
+			},
+			include: { connectedStores: true },
 		})
-		.catch((err) => {
+		.then((result) => {
+			res.status(201).json({
+				message: "Item created!",
+				item: {
+					...toMongoDoc(result),
+					connectedStores: result.connectedStores.map((cs) => ({
+						storeId: cs.storeId,
+						storeName: cs.storeName,
+						storeItemId: cs.storeItemId,
+						storeItemName: cs.storeItemName,
+					})),
+				},
+			});
+		})
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -144,7 +199,8 @@ export const updateItem = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	Item.findOne({ _id: itemId, householdId })
+	prisma.item
+		.findFirst({ where: { id: itemId, householdId } })
 		.then((item) => {
 			if (!item) {
 				const error = new Error("Item not found") as any;
@@ -152,16 +208,52 @@ export const updateItem = (req: Request, res: Response, next: NextFunction) => {
 				throw error;
 			}
 
-			if (name !== undefined) item.name = name;
-			if (type !== undefined) item.type = type;
-			if (connectedStores !== undefined) item.connectedStores = connectedStores;
+			const updateData: any = {};
+			if (name !== undefined) updateData.name = name;
+			if (type !== undefined) updateData.typeId = type;
 
-			return item.save();
+			if (connectedStores !== undefined) {
+				return prisma.$transaction([
+					prisma.itemConnectedStore.deleteMany({ where: { itemId } }),
+					prisma.item.update({
+						where: { id: itemId },
+						data: {
+							...updateData,
+							connectedStores: {
+								create: (connectedStores as any[]).map((cs: any) => ({
+									storeId: cs.storeId,
+									storeName: cs.storeName,
+									storeItemId: cs.storeItemId || "",
+									storeItemName: cs.storeItemName || "",
+								})),
+							},
+						},
+						include: { connectedStores: true },
+					}),
+				]).then(([, updated]) => updated);
+			}
+
+			return prisma.item.update({
+				where: { id: itemId },
+				data: updateData,
+				include: { connectedStores: true },
+			});
 		})
-		.then((updated) => {
-			res.status(200).json({ message: "Item updated successfully", item: updated });
+		.then((updated: any) => {
+			res.status(200).json({
+				message: "Item updated successfully",
+				item: {
+					...toMongoDoc(updated),
+					connectedStores: updated.connectedStores.map((cs: any) => ({
+						storeId: cs.storeId,
+						storeName: cs.storeName,
+						storeItemId: cs.storeItemId,
+						storeItemName: cs.storeItemName,
+					})),
+				},
+			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -183,16 +275,20 @@ export const deleteItem = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	Item.findOneAndDelete({ _id: itemId, householdId })
-		.then((result) => {
-			if (!result) {
+	prisma.item
+		.findFirst({ where: { id: itemId, householdId } })
+		.then((item) => {
+			if (!item) {
 				const error = new Error("Item not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.item.delete({ where: { id: itemId } });
+		})
+		.then(() => {
 			res.status(200).json({ message: "Item deleted successfully" });
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -220,7 +316,8 @@ export const addConnectedStore = (
 		return next(error);
 	}
 
-	Store.findOne({ _id: storeId, householdId })
+	prisma.store
+		.findFirst({ where: { id: storeId, householdId } })
 		.then((store) => {
 			if (!store) {
 				const error = new Error("Store not found") as any;
@@ -228,30 +325,46 @@ export const addConnectedStore = (
 				throw error;
 			}
 
-			return Item.findOne({ _id: itemId, householdId }).then((item) => {
-				if (!item) {
-					const error = new Error("Item not found") as any;
-					error.statusCode = 404;
-					throw error;
-				}
+			return prisma.item
+				.findFirst({ where: { id: itemId, householdId } })
+				.then((item) => {
+					if (!item) {
+						const error = new Error("Item not found") as any;
+						error.statusCode = 404;
+						throw error;
+					}
 
-				item.connectedStores.push({
-					storeId: store._id,
-					storeName: store.name,
-					storeItemId,
-					storeItemName,
+					return prisma.item.update({
+						where: { id: itemId },
+						data: {
+							connectedStores: {
+								create: {
+									storeId: store.id,
+									storeName: store.name,
+									storeItemId,
+									storeItemName,
+								},
+							},
+						},
+						include: { connectedStores: true },
+					});
 				});
-
-				return item.save();
-			});
 		})
 		.then((updated) => {
 			res.status(200).json({
 				message: "Store added to item",
-				item: updated,
+				item: {
+					...toMongoDoc(updated),
+					connectedStores: updated.connectedStores.map((cs) => ({
+						storeId: cs.storeId,
+						storeName: cs.storeName,
+						storeItemId: cs.storeItemId,
+						storeItemName: cs.storeItemName,
+					})),
+				},
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

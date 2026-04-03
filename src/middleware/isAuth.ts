@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import User from "../models/user";
-import Household from "../models/household";
+import { prisma } from "../lib/prisma";
 
 export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 	const token = req.cookies?.auth_token;
@@ -30,19 +29,19 @@ export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 		return res.status(401).json({ message: "Unauthorized" });
 	}
 
-	User.findById(userId)
-		.select("-password")
+	prisma.user
+		.findUnique({
+			where: { id: userId },
+			select: { id: true, name: true, email: true },
+		})
 		.then((user) => {
 			if (!user) {
 				res.status(401).json({ message: "Unauthorized" });
 				return;
 			}
 			req.user = user;
-
 			req.householdId = req.cookies?.household_id;
 			next();
-
-			//return Household.findOne({ "owner._id": user._id });
 		})
 		.catch(() => {
 			res.status(401).json({ message: "Unauthorized" });

@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import ShelfType from "../../models/shelfType";
+import { prisma } from "../../lib/prisma";
+import { toMongoDoc } from "../../lib/serialize";
 
 export const getShelfTypes = (
 	req: Request,
@@ -22,17 +23,18 @@ export const getShelfTypes = (
 		return next(error);
 	}
 
-	ShelfType.find({ householdId: householdId })
+	prisma.shelfType
+		.findMany({ where: { householdId } })
 		.then((shelfTypes) => {
 			res.status(200).json({
-				shelfTypes: shelfTypes.map((shelfType) => ({
-					_id: shelfType._id,
-					name: shelfType.name,
-					householdId: shelfType.householdId,
+				shelfTypes: shelfTypes.map((st) => ({
+					_id: st.id,
+					name: st.name,
+					householdId: st.householdId,
 				})),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -53,20 +55,15 @@ export const createShelfType = (
 		return next(error);
 	}
 
-	const shelfType = new ShelfType({
-		name,
-		householdId,
-	});
-
-	shelfType
-		.save()
+	prisma.shelfType
+		.create({ data: { name, householdId } })
 		.then((result) => {
 			res.status(201).json({
 				message: "Shelf type created!",
-				shelfType: result,
+				shelfType: toMongoDoc(result),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -89,23 +86,26 @@ export const renameShelfType = (
 		return next(error);
 	}
 
-	ShelfType.findById(shelfTypeId)
+	prisma.shelfType
+		.findUnique({ where: { id: shelfTypeId } })
 		.then((shelfType) => {
 			if (!shelfType) {
 				const error = new Error("Shelf type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			shelfType.name = newName;
-			return shelfType.save();
+			return prisma.shelfType.update({
+				where: { id: shelfTypeId },
+				data: { name: newName },
+			});
 		})
 		.then((updated) => {
 			res.status(200).json({
 				message: "Shelf type renamed successfully",
-				shelfTypeId: updated._id,
+				shelfTypeId: updated.id,
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -124,18 +124,22 @@ export const deleteShelfType = (
 		return next(error);
 	}
 
-	ShelfType.findByIdAndDelete(shelfTypeId)
-		.then((result) => {
-			if (!result) {
+	prisma.shelfType
+		.findUnique({ where: { id: shelfTypeId } })
+		.then((shelfType) => {
+			if (!shelfType) {
 				const error = new Error("Shelf type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.shelfType.delete({ where: { id: shelfTypeId } });
+		})
+		.then(() => {
 			res.status(200).json({
 				message: "Shelf type deleted successfully",
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

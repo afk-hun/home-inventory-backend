@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import ItemType from "../../models/itemType";
+import { prisma } from "../../lib/prisma";
+import { toMongoDoc } from "../../lib/serialize";
 
 export const getItemTypes = (
 	req: Request,
@@ -22,17 +23,18 @@ export const getItemTypes = (
 		return next(error);
 	}
 
-	ItemType.find({ householdId })
+	prisma.itemType
+		.findMany({ where: { householdId } })
 		.then((itemTypes) => {
 			res.status(200).json({
-				itemTypes: itemTypes.map((itemType) => ({
-					_id: itemType._id,
-					name: itemType.name,
-					householdId: itemType.householdId,
+				itemTypes: itemTypes.map((it) => ({
+					_id: it.id,
+					name: it.name,
+					householdId: it.householdId,
 				})),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -55,17 +57,15 @@ export const createItemType = (
 		return next(error);
 	}
 
-	const itemType = new ItemType({ householdId, name });
-
-	itemType
-		.save()
+	prisma.itemType
+		.create({ data: { householdId, name } })
 		.then((result) => {
 			res.status(201).json({
 				message: "Item type created!",
-				itemType: result,
+				itemType: toMongoDoc(result),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -87,23 +87,26 @@ export const renameItemType = (
 		return next(error);
 	}
 
-	ItemType.findById(itemTypeId)
+	prisma.itemType
+		.findUnique({ where: { id: itemTypeId } })
 		.then((itemType) => {
 			if (!itemType) {
 				const error = new Error("Item type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			itemType.name = name;
-			return itemType.save();
+			return prisma.itemType.update({
+				where: { id: itemTypeId },
+				data: { name },
+			});
 		})
 		.then((updated) => {
 			res.status(200).json({
 				message: "Item type renamed successfully",
-				itemTypeId: updated._id,
+				itemTypeId: updated.id,
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -122,18 +125,22 @@ export const deleteItemType = (
 		return next(error);
 	}
 
-	ItemType.findByIdAndDelete(itemTypeId)
-		.then((result) => {
-			if (!result) {
+	prisma.itemType
+		.findUnique({ where: { id: itemTypeId } })
+		.then((itemType) => {
+			if (!itemType) {
 				const error = new Error("Item type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.itemType.delete({ where: { id: itemTypeId } });
+		})
+		.then(() => {
 			res.status(200).json({
 				message: "Item type deleted successfully",
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

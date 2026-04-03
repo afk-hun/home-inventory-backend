@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import InvoiceItem from "../models/invoiceItem";
+import { prisma } from "../lib/prisma";
+import { toMongoDoc } from "../lib/serialize";
 
 export const getInvoiceItems = (
 	req: Request,
@@ -15,14 +16,20 @@ export const getInvoiceItems = (
 		return next(error);
 	}
 
-	const filter: Record<string, unknown> = { householdId };
-	if (req.query.storeId) filter["store.id"] = req.query.storeId;
+	const where: any = { householdId };
+	if (req.query.storeId) where.storeId = req.query.storeId;
 
-	InvoiceItem.find(filter)
+	prisma.invoiceItem
+		.findMany({ where })
 		.then((items) => {
-			res.status(200).json({ invoiceItems: items });
+			res.status(200).json({
+				invoiceItems: items.map((item) => ({
+					...toMongoDoc(item),
+					store: { id: item.storeId, name: item.storeName },
+				})),
+			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -41,16 +48,22 @@ export const getInvoiceItem = (
 		return next(error);
 	}
 
-	InvoiceItem.findById(id)
+	prisma.invoiceItem
+		.findUnique({ where: { id } })
 		.then((item) => {
 			if (!item) {
 				const error = new Error("Invoice item not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			res.status(200).json({ invoiceItem: item });
+			res.status(200).json({
+				invoiceItem: {
+					...toMongoDoc(item),
+					store: { id: item.storeId, name: item.storeName },
+				},
+			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -94,27 +107,31 @@ export const createInvoiceItem = (
 		return next(error);
 	}
 
-	const item = new InvoiceItem({
-		householdId,
-		store,
-		inStoreId,
-		inStoreName,
-		inStorePrice,
-		inStoreUnitPrice,
-		inStoreQuantity,
-		inStoreUnit,
-		inStoreTaxType,
-	});
-
-	item
-		.save()
+	prisma.invoiceItem
+		.create({
+			data: {
+				householdId,
+				storeId: store.id,
+				storeName: store.name,
+				inStoreId,
+				inStoreName,
+				inStorePrice,
+				inStoreUnitPrice,
+				inStoreQuantity,
+				inStoreUnit,
+				inStoreTaxType,
+			},
+		})
 		.then((result) => {
 			res.status(201).json({
 				message: "Invoice item created!",
-				invoiceItem: result,
+				invoiceItem: {
+					...toMongoDoc(result),
+					store: { id: result.storeId, name: result.storeName },
+				},
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -143,7 +160,8 @@ export const updateInvoiceItem = (
 		return next(error);
 	}
 
-	InvoiceItem.findById(invoiceItemId)
+	prisma.invoiceItem
+		.findUnique({ where: { id: invoiceItemId } })
 		.then((item) => {
 			if (!item) {
 				const error = new Error("Invoice item not found") as any;
@@ -151,24 +169,34 @@ export const updateInvoiceItem = (
 				throw error;
 			}
 
-			if (store !== undefined) item.store = store;
-			if (inStoreId !== undefined) item.inStoreId = inStoreId;
-			if (inStoreName !== undefined) item.inStoreName = inStoreName;
-			if (inStorePrice !== undefined) item.inStorePrice = inStorePrice;
-			if (inStoreUnitPrice !== undefined) item.inStoreUnitPrice = inStoreUnitPrice;
-			if (inStoreQuantity !== undefined) item.inStoreQuantity = inStoreQuantity;
-			if (inStoreUnit !== undefined) item.inStoreUnit = inStoreUnit;
-			if (inStoreTaxType !== undefined) item.inStoreTaxType = inStoreTaxType;
+			const updateData: any = {};
+			if (store !== undefined) {
+				updateData.storeId = store.id;
+				updateData.storeName = store.name;
+			}
+			if (inStoreId !== undefined) updateData.inStoreId = inStoreId;
+			if (inStoreName !== undefined) updateData.inStoreName = inStoreName;
+			if (inStorePrice !== undefined) updateData.inStorePrice = inStorePrice;
+			if (inStoreUnitPrice !== undefined) updateData.inStoreUnitPrice = inStoreUnitPrice;
+			if (inStoreQuantity !== undefined) updateData.inStoreQuantity = inStoreQuantity;
+			if (inStoreUnit !== undefined) updateData.inStoreUnit = inStoreUnit;
+			if (inStoreTaxType !== undefined) updateData.inStoreTaxType = inStoreTaxType;
 
-			return item.save();
+			return prisma.invoiceItem.update({
+				where: { id: invoiceItemId },
+				data: updateData,
+			});
 		})
 		.then((updated) => {
 			res.status(200).json({
 				message: "Invoice item updated successfully",
-				invoiceItem: updated,
+				invoiceItem: {
+					...toMongoDoc(updated),
+					store: { id: updated.storeId, name: updated.storeName },
+				},
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -187,16 +215,20 @@ export const deleteInvoiceItem = (
 		return next(error);
 	}
 
-	InvoiceItem.findByIdAndDelete(invoiceItemId)
-		.then((result) => {
-			if (!result) {
+	prisma.invoiceItem
+		.findUnique({ where: { id: invoiceItemId } })
+		.then((item) => {
+			if (!item) {
 				const error = new Error("Invoice item not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.invoiceItem.delete({ where: { id: invoiceItemId } });
+		})
+		.then(() => {
 			res.status(200).json({ message: "Invoice item deleted successfully" });
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

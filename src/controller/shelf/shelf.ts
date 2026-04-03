@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import Shelf from "../../models/shelf";
-import "../../models/item"
+import { prisma } from "../../lib/prisma";
+import { toMongoDoc } from "../../lib/serialize";
 
 export const getShelves = (
 	req: Request,
@@ -19,14 +19,14 @@ export const getShelves = (
 		return next(error);
 	}
 
-	Shelf.countDocuments({ householdId })
+	prisma.shelf
+		.count({ where: { householdId } })
 		.then((total) => {
-			return Shelf.find({ householdId })
-				.skip(skip)
-				.limit(limit)
+			return prisma.shelf
+				.findMany({ where: { householdId }, skip, take: limit })
 				.then((shelves) => {
 					res.status(200).json({
-						shelves,
+						shelves: shelves.map(toMongoDoc),
 						pagination: {
 							total,
 							page,
@@ -36,7 +36,7 @@ export const getShelves = (
 					});
 				});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -52,18 +52,35 @@ export const getShelf = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	Shelf.findOne({ _id: id, householdId })
-		.populate("items.item", "name")
-		.populate("items.unit", "name")
+	prisma.shelf
+		.findFirst({
+			where: { id, householdId },
+			include: {
+				items: {
+					include: { item: { select: { id: true, name: true } } },
+				},
+			},
+		})
 		.then((shelf) => {
 			if (!shelf) {
 				const error = new Error("Shelf not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			res.status(200).json({ shelf });
+			res.status(200).json({
+				shelf: {
+					...toMongoDoc(shelf),
+					items: shelf.items.map((si) => ({
+						_id: si.id,
+						item: { _id: si.item.id, name: si.item.name },
+						itemName: si.itemName,
+						quantity: si.quantity,
+						unit: si.unit,
+					})),
+				},
+			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -89,20 +106,19 @@ export const createShelf = (
 		return next(error);
 	}
 
-	const shelf = new Shelf({
-		householdId,
-		name,
-		...(place !== undefined && { place }),
-		...(type !== undefined && { type }),
-		items: [],
-	});
-
-	shelf
-		.save()
-		.then((result) => {
-			res.status(201).json({ message: "Shelf created!", shelf: result });
+	prisma.shelf
+		.create({
+			data: {
+				householdId,
+				name,
+				...(place !== undefined && { place }),
+				...(type !== undefined && { type }),
+			},
 		})
-		.catch((err) => {
+		.then((result) => {
+			res.status(201).json({ message: "Shelf created!", shelf: toMongoDoc(result) });
+		})
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -128,7 +144,8 @@ export const updateShelf = (
 		return next(error);
 	}
 
-	Shelf.findOne({ _id: shelfId, householdId })
+	prisma.shelf
+		.findFirst({ where: { id: shelfId, householdId } })
 		.then((shelf) => {
 			if (!shelf) {
 				const error = new Error("Shelf not found") as any;
@@ -136,19 +153,20 @@ export const updateShelf = (
 				throw error;
 			}
 
-			if (name !== undefined) shelf.name = name;
-			if (place !== undefined) shelf.place = place;
-			if (type !== undefined) shelf.type = type;
+			const updateData: any = {};
+			if (name !== undefined) updateData.name = name;
+			if (place !== undefined) updateData.place = place;
+			if (type !== undefined) updateData.type = type;
 
-			return shelf.save();
+			return prisma.shelf.update({ where: { id: shelfId }, data: updateData });
 		})
 		.then((updated) => {
 			res.status(200).json({
 				message: "Shelf updated successfully",
-				shelf: updated,
+				shelf: toMongoDoc(updated),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -174,16 +192,20 @@ export const deleteShelf = (
 		return next(error);
 	}
 
-	Shelf.findOneAndDelete({ _id: shelfId, householdId })
-		.then((result) => {
-			if (!result) {
+	prisma.shelf
+		.findFirst({ where: { id: shelfId, householdId } })
+		.then((shelf) => {
+			if (!shelf) {
 				const error = new Error("Shelf not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.shelf.delete({ where: { id: shelfId } });
+		})
+		.then(() => {
 			res.status(200).json({ message: "Shelf deleted successfully" });
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -211,7 +233,8 @@ export const addShelfItem = (
 		return next(error);
 	}
 
-	Shelf.findOne({ _id: shelfId, householdId })
+	prisma.shelf
+		.findFirst({ where: { id: shelfId, householdId } })
 		.then((shelf) => {
 			if (!shelf) {
 				const error = new Error("Shelf not found") as any;
@@ -219,21 +242,43 @@ export const addShelfItem = (
 				throw error;
 			}
 
-			const newItem: any = { item: itemId, quantity };
-			if (itemName !== undefined) newItem.itemName = itemName;
-			if (unit !== undefined) newItem.unit = unit;
-
-			shelf.items.push(newItem);
-
-			return shelf.save();
+			return prisma.shelfItem
+				.create({
+					data: {
+						shelfId,
+						itemId,
+						quantity,
+						...(itemName !== undefined && { itemName }),
+						...(unit !== undefined && { unit }),
+					},
+				})
+				.then(() => {
+					return prisma.shelf.findFirst({
+						where: { id: shelfId },
+						include: {
+							items: {
+								include: { item: { select: { id: true, name: true } } },
+							},
+						},
+					});
+				});
 		})
-		.then((updated) => {
+		.then((updated: any) => {
 			res.status(200).json({
 				message: "Item added to shelf",
-				shelf: updated,
+				shelf: {
+					...toMongoDoc(updated),
+					items: updated.items.map((si: any) => ({
+						_id: si.id,
+						item: { _id: si.item.id, name: si.item.name },
+						itemName: si.itemName,
+						quantity: si.quantity,
+						unit: si.unit,
+					})),
+				},
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -259,7 +304,8 @@ export const removeShelfItem = (
 		return next(error);
 	}
 
-	Shelf.findOne({ _id: shelfId, householdId })
+	prisma.shelf
+		.findFirst({ where: { id: shelfId, householdId } })
 		.then((shelf) => {
 			if (!shelf) {
 				const error = new Error("Shelf not found") as any;
@@ -267,27 +313,43 @@ export const removeShelfItem = (
 				throw error;
 			}
 
-			const itemIndex = shelf.items.findIndex(
-				(i) => i._id.toString() === shelfItemId.toString(),
-			);
-
-			if (itemIndex === -1) {
-				const error = new Error("Shelf item not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-
-			shelf.items.splice(itemIndex, 1);
-
-			return shelf.save();
+			return prisma.shelfItem
+				.findFirst({ where: { id: shelfItemId, shelfId } })
+				.then((shelfItem) => {
+					if (!shelfItem) {
+						const error = new Error("Shelf item not found") as any;
+						error.statusCode = 404;
+						throw error;
+					}
+					return prisma.shelfItem.delete({ where: { id: shelfItemId } });
+				})
+				.then(() => {
+					return prisma.shelf.findFirst({
+						where: { id: shelfId },
+						include: {
+							items: {
+								include: { item: { select: { id: true, name: true } } },
+							},
+						},
+					});
+				});
 		})
-		.then((updated) => {
+		.then((updated: any) => {
 			res.status(200).json({
 				message: "Item removed from shelf",
-				shelf: updated,
+				shelf: {
+					...toMongoDoc(updated),
+					items: updated.items.map((si: any) => ({
+						_id: si.id,
+						item: { _id: si.item.id, name: si.item.name },
+						itemName: si.itemName,
+						quantity: si.quantity,
+						unit: si.unit,
+					})),
+				},
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

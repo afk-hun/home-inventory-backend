@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import UnitType from "../models/unitType";
+import { prisma } from "../lib/prisma";
+import { toMongoDoc } from "../lib/serialize";
 
 export const getUnitTypes = (
 	req: Request,
@@ -22,17 +23,18 @@ export const getUnitTypes = (
 		return next(error);
 	}
 
-	UnitType.find({ householdId: householdId })
+	prisma.unitType
+		.findMany({ where: { householdId } })
 		.then((unitTypes) => {
 			res.status(200).json({
-				unitTypes: unitTypes.map((unitType) => ({
-					_id: unitType._id,
-					name: unitType.name,
-					householdId: unitType.householdId,
+				unitTypes: unitTypes.map((ut) => ({
+					_id: ut.id,
+					name: ut.name,
+					householdId: ut.householdId,
 				})),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -53,20 +55,15 @@ export const createUnitType = (
 		return next(error);
 	}
 
-	const unitType = new UnitType({
-		name,
-		householdId,
-	});
-
-	unitType
-		.save()
+	prisma.unitType
+		.create({ data: { name, householdId } })
 		.then((result) => {
 			res.status(201).json({
 				message: "Unit type created!",
-				unitType: result,
+				unitType: toMongoDoc(result),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -89,23 +86,26 @@ export const renameUnitType = (
 		return next(error);
 	}
 
-	UnitType.findById(unitTypeId)
+	prisma.unitType
+		.findUnique({ where: { id: unitTypeId } })
 		.then((unitType) => {
 			if (!unitType) {
 				const error = new Error("Unit type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			unitType.name = newName;
-			return unitType.save();
+			return prisma.unitType.update({
+				where: { id: unitTypeId },
+				data: { name: newName },
+			});
 		})
 		.then((updated) => {
 			res.status(200).json({
 				message: "Unit type renamed successfully",
-				unitTypeId: updated._id,
+				unitTypeId: updated.id,
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -124,18 +124,22 @@ export const deleteUnitType = (
 		return next(error);
 	}
 
-	UnitType.findByIdAndDelete(unitTypeId)
-		.then((result) => {
-			if (!result) {
+	prisma.unitType
+		.findUnique({ where: { id: unitTypeId } })
+		.then((unitType) => {
+			if (!unitType) {
 				const error = new Error("Unit type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.unitType.delete({ where: { id: unitTypeId } });
+		})
+		.then(() => {
 			res.status(200).json({
 				message: "Unit type deleted successfully",
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

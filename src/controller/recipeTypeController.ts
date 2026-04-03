@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import RecipeType from "../models/recipeType";
+import { prisma } from "../lib/prisma";
+import { toMongoDoc } from "../lib/serialize";
 
 export const getRecipeTypes = (
 	req: Request,
@@ -22,17 +23,18 @@ export const getRecipeTypes = (
 		return next(error);
 	}
 
-	RecipeType.find({ householdId: householdId })
+	prisma.recipeType
+		.findMany({ where: { householdId } })
 		.then((recipeTypes) => {
 			res.status(200).json({
-				recipeTypes: recipeTypes.map((recipeType) => ({
-					_id: recipeType._id,
-					name: recipeType.name,
-					householdId: recipeType.householdId,
+				recipeTypes: recipeTypes.map((rt) => ({
+					_id: rt.id,
+					name: rt.name,
+					householdId: rt.householdId,
 				})),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -53,20 +55,15 @@ export const createRecipeType = (
 		return next(error);
 	}
 
-	const recipeType = new RecipeType({
-		name,
-		householdId,
-	});
-
-	recipeType
-		.save()
+	prisma.recipeType
+		.create({ data: { name, householdId } })
 		.then((result) => {
 			res.status(201).json({
 				message: "Recipe type created!",
-				recipeType: result,
+				recipeType: toMongoDoc(result),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -89,23 +86,26 @@ export const renameRecipeType = (
 		return next(error);
 	}
 
-	RecipeType.findById(recipeTypeId)
+	prisma.recipeType
+		.findUnique({ where: { id: recipeTypeId } })
 		.then((recipeType) => {
 			if (!recipeType) {
 				const error = new Error("Recipe type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			recipeType.name = newName;
-			return recipeType.save();
+			return prisma.recipeType.update({
+				where: { id: recipeTypeId },
+				data: { name: newName },
+			});
 		})
 		.then((updated) => {
 			res.status(200).json({
 				message: "Recipe type renamed successfully",
-				recipeTypeId: updated._id,
+				recipeTypeId: updated.id,
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -124,18 +124,22 @@ export const deleteRecipeType = (
 		return next(error);
 	}
 
-	RecipeType.findByIdAndDelete(recipeTypeId)
-		.then((result) => {
-			if (!result) {
+	prisma.recipeType
+		.findUnique({ where: { id: recipeTypeId } })
+		.then((recipeType) => {
+			if (!recipeType) {
 				const error = new Error("Recipe type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.recipeType.delete({ where: { id: recipeTypeId } });
+		})
+		.then(() => {
 			res.status(200).json({
 				message: "Recipe type deleted successfully",
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

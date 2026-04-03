@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import MealType from "../models/mealType";
+import { prisma } from "../lib/prisma";
+import { toMongoDoc } from "../lib/serialize";
 
 export const getMealTypes = (
 	req: Request,
@@ -22,17 +23,18 @@ export const getMealTypes = (
 		return next(error);
 	}
 
-	MealType.find({ householdId })
+	prisma.mealType
+		.findMany({ where: { householdId } })
 		.then((mealTypes) => {
 			res.status(200).json({
-				mealTypes: mealTypes.map((mealType) => ({
-					_id: mealType._id,
-					name: mealType.name,
-					householdId: mealType.householdId,
+				mealTypes: mealTypes.map((mt) => ({
+					_id: mt.id,
+					name: mt.name,
+					householdId: mt.householdId,
 				})),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -53,17 +55,15 @@ export const createMealType = (
 		return next(error);
 	}
 
-	const mealType = new MealType({ name, householdId });
-
-	mealType
-		.save()
+	prisma.mealType
+		.create({ data: { name, householdId } })
 		.then((result) => {
 			res.status(201).json({
 				message: "Meal type created!",
-				mealType: result,
+				mealType: toMongoDoc(result),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -86,23 +86,26 @@ export const renameMealType = (
 		return next(error);
 	}
 
-	MealType.findById(mealTypeId)
+	prisma.mealType
+		.findUnique({ where: { id: mealTypeId } })
 		.then((mealType) => {
 			if (!mealType) {
 				const error = new Error("Meal type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			mealType.name = newName;
-			return mealType.save();
+			return prisma.mealType.update({
+				where: { id: mealTypeId },
+				data: { name: newName },
+			});
 		})
 		.then((updated) => {
 			res.status(200).json({
 				message: "Meal type renamed successfully",
-				mealTypeId: updated._id,
+				mealTypeId: updated.id,
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -121,16 +124,20 @@ export const deleteMealType = (
 		return next(error);
 	}
 
-	MealType.findByIdAndDelete(mealTypeId)
-		.then((result) => {
-			if (!result) {
+	prisma.mealType
+		.findUnique({ where: { id: mealTypeId } })
+		.then((mealType) => {
+			if (!mealType) {
 				const error = new Error("Meal type not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.mealType.delete({ where: { id: mealTypeId } });
+		})
+		.then(() => {
 			res.status(200).json({ message: "Meal type deleted successfully" });
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

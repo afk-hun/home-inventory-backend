@@ -1,10 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
-import User, { IUser } from "../models/user";
 import jwt from "jsonwebtoken";
 import { CSRF_MAX_AGE_MS } from "./csrf";
-import Household from "../models/household";
+import { prisma } from "../lib/prisma";
 
 const ACCESS_TOKEN_COOKIE_NAME = "auth_token";
 const REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
@@ -158,20 +157,22 @@ export const signup = (req: Request, res: Response, next: NextFunction) => {
 	bcrypt
 		.hash(password, 12)
 		.then((hashedPassword) => {
-			const user = new User({
-				email: email,
-				name: name,
-				password: hashedPassword,
+			return prisma.user.create({
+				data: { email, name, password: hashedPassword },
 			});
-			return user.save();
 		})
 		.then((result) => {
 			res.status(201).json({
 				message: "User created!",
-				userId: result._id,
+				userId: result.id,
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
+			if (err?.code === "P2002") {
+				const error = new CustomError("E-mail address already exists!");
+				error.statusCode = 422;
+				return next(error);
+			}
 			if (!err.statusCode) {
 				err.statusCode = 500;
 			}
@@ -196,8 +197,11 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 	const email = req.body.email;
 	const password = req.body.password;
 
-	let loadedUser: IUser;
-	User.findOne({ email: email })
+	let loadedUserId: string;
+	let loadedUserEmail: string;
+
+	prisma.user
+		.findUnique({ where: { email } })
 		.then((user) => {
 			if (!user) {
 				const error = new CustomError(
@@ -206,7 +210,8 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 				error.statusCode = 401;
 				throw error;
 			}
-			loadedUser = user;
+			loadedUserId = user.id;
+			loadedUserEmail = user.email;
 			return bcrypt.compare(password, user.password);
 		})
 		.then((isEqual) => {
@@ -218,31 +223,32 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 				throw error;
 			}
 			const basePayload = {
-				email: loadedUser.email,
-				userId: loadedUser._id.toString(),
+				email: loadedUserEmail,
+				userId: loadedUserId,
 			};
 			const accessToken = signAccessToken(basePayload);
 			const refreshToken = signRefreshToken(basePayload);
 			setAccessTokenCookie(res, accessToken);
 			setRefreshTokenCookie(res, refreshToken);
-			setUserCookie(res, loadedUser._id.toString());
-			// res.status(200).json({
-			// 	message: "Logged in successfully.",
-			// });
-			return Household.findOne({ "owner._id": loadedUser._id });
+			setUserCookie(res, loadedUserId);
+			return prisma.household.findFirst({
+				where: { ownerId: loadedUserId },
+			});
 		})
 		.then((household) => {
-			if (!household) {
-				const error = new CustomError("No household found for user.");
-				error.statusCode = 404;
-				throw error;
+			// if (!household) {
+			// 	const error = new CustomError("No household found for user.");
+			// 	error.statusCode = 404;
+			// 	throw error;
+			// }
+			if (household) {
+				setHouseholdCookie(res, household.id);
 			}
-			setHouseholdCookie(res, household._id.toString());
 			res.status(200).json({
 				message: "Logged in successfully.",
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) {
 				err.statusCode = 500;
 			}

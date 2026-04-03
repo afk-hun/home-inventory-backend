@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import ShoppingList from "../models/shoppingList";
+import { prisma } from "../lib/prisma";
+import { toMongoDoc } from "../lib/serialize";
 
 export const getShoppingLists = (
 	req: Request,
@@ -15,11 +16,23 @@ export const getShoppingLists = (
 		return next(error);
 	}
 
-	ShoppingList.find({ householdId })
+	prisma.shoppingList
+		.findMany({ where: { householdId }, include: { items: true } })
 		.then((lists) => {
-			res.status(200).json({ shoppingLists: lists });
+			res.status(200).json({
+				shoppingLists: lists.map((list) => ({
+					...toMongoDoc(list),
+					items: list.items.map((item) => ({
+						_id: item.id,
+						itemName: item.itemName,
+						quantity: item.quantity,
+						unit: item.unit,
+						checked: item.checked,
+					})),
+				})),
+			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -45,16 +58,31 @@ export const getShoppingList = (
 		return next(error);
 	}
 
-	ShoppingList.findOne({ _id: shoppingListId, householdId })
+	prisma.shoppingList
+		.findFirst({
+			where: { id: shoppingListId, householdId },
+			include: { items: true },
+		})
 		.then((list) => {
 			if (!list) {
 				const error = new Error("Shopping list not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			res.status(200).json({ shoppingList: list });
+			res.status(200).json({
+				shoppingList: {
+					...toMongoDoc(list),
+					items: list.items.map((item) => ({
+						_id: item.id,
+						itemName: item.itemName,
+						quantity: item.quantity,
+						unit: item.unit,
+						checked: item.checked,
+					})),
+				},
+			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -80,22 +108,41 @@ export const createShoppingList = (
 		return next(error);
 	}
 
-	const shoppingList = new ShoppingList({
-		householdId,
-		name,
-		storeId,
-		items: items || [],
-	});
+	const itemList: any[] = items || [];
 
-	shoppingList
-		.save()
+	prisma.shoppingList
+		.create({
+			data: {
+				householdId,
+				name,
+				storeId,
+				items: {
+					create: itemList.map((item: any) => ({
+						itemName: item.itemName,
+						quantity: item.quantity,
+						unit: item.unit,
+						checked: item.checked ?? false,
+					})),
+				},
+			},
+			include: { items: true },
+		})
 		.then((result) => {
 			res.status(201).json({
 				message: "Shopping list created!",
-				shoppingList: result,
+				shoppingList: {
+					...toMongoDoc(result),
+					items: result.items.map((item) => ({
+						_id: item.id,
+						itemName: item.itemName,
+						quantity: item.quantity,
+						unit: item.unit,
+						checked: item.checked,
+					})),
+				},
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -121,7 +168,8 @@ export const updateShoppingList = (
 		return next(error);
 	}
 
-	ShoppingList.findOne({ _id: shoppingListId, householdId })
+	prisma.shoppingList
+		.findFirst({ where: { id: shoppingListId, householdId } })
 		.then((list) => {
 			if (!list) {
 				const error = new Error("Shopping list not found") as any;
@@ -129,19 +177,53 @@ export const updateShoppingList = (
 				throw error;
 			}
 
-			if (name !== undefined) list.name = name;
-			if (storeId !== undefined) list.storeId = storeId;
-			if (items !== undefined) list.items = items;
+			const updateData: any = {};
+			if (name !== undefined) updateData.name = name;
+			if (storeId !== undefined) updateData.storeId = storeId;
 
-			return list.save();
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Shopping list updated successfully",
-				shoppingList: updated,
+			if (items !== undefined) {
+				return prisma.$transaction([
+					prisma.shoppingListItem.deleteMany({ where: { shoppingListId } }),
+					prisma.shoppingList.update({
+						where: { id: shoppingListId },
+						data: {
+							...updateData,
+							items: {
+								create: (items as any[]).map((item: any) => ({
+									itemName: item.itemName,
+									quantity: item.quantity,
+									unit: item.unit,
+									checked: item.checked ?? false,
+								})),
+							},
+						},
+						include: { items: true },
+					}),
+				]).then(([, updated]) => updated);
+			}
+
+			return prisma.shoppingList.update({
+				where: { id: shoppingListId },
+				data: updateData,
+				include: { items: true },
 			});
 		})
-		.catch((err) => {
+		.then((updated: any) => {
+			res.status(200).json({
+				message: "Shopping list updated successfully",
+				shoppingList: {
+					...toMongoDoc(updated),
+					items: updated.items.map((item: any) => ({
+						_id: item.id,
+						itemName: item.itemName,
+						quantity: item.quantity,
+						unit: item.unit,
+						checked: item.checked,
+					})),
+				},
+			});
+		})
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -167,16 +249,20 @@ export const deleteShoppingList = (
 		return next(error);
 	}
 
-	ShoppingList.findOneAndDelete({ _id: shoppingListId, householdId })
-		.then((result) => {
-			if (!result) {
+	prisma.shoppingList
+		.findFirst({ where: { id: shoppingListId, householdId } })
+		.then((list) => {
+			if (!list) {
 				const error = new Error("Shopping list not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.shoppingList.delete({ where: { id: shoppingListId } });
+		})
+		.then(() => {
 			res.status(200).json({ message: "Shopping list deleted successfully" });
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

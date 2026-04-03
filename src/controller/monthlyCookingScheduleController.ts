@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import MonthlyCookingSchedule from "../models/monthlyCookingSchedule";
+import { prisma } from "../lib/prisma";
+import { toMongoDoc } from "../lib/serialize";
 
 export const getSchedules = (
 	req: Request,
@@ -22,11 +23,24 @@ export const getSchedules = (
 		return next(error);
 	}
 
-	MonthlyCookingSchedule.find({ householdId })
+	prisma.monthlyCookingSchedule
+		.findMany({ where: { householdId }, include: { meals: true } })
 		.then((schedules) => {
-			res.status(200).json({ schedules });
+			res.status(200).json({
+				schedules: schedules.map((s) => ({
+					...toMongoDoc(s),
+					meals: s.meals.map((m) => ({
+						_id: m.id,
+						start: m.start,
+						end: m.end,
+						mealType: m.mealType,
+						recipe: m.recipeId,
+						portion: m.portion,
+					})),
+				})),
+			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -53,16 +67,32 @@ export const getSchedule = (
 		return next(error);
 	}
 
-	MonthlyCookingSchedule.findOne({ _id: scheduleId, householdId })
+	prisma.monthlyCookingSchedule
+		.findFirst({
+			where: { id: scheduleId, householdId },
+			include: { meals: true },
+		})
 		.then((schedule) => {
 			if (!schedule) {
 				const error = new Error("Schedule not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			res.status(200).json({ schedule });
+			res.status(200).json({
+				schedule: {
+					...toMongoDoc(schedule),
+					meals: schedule.meals.map((m) => ({
+						_id: m.id,
+						start: m.start,
+						end: m.end,
+						mealType: m.mealType,
+						recipe: m.recipeId,
+						portion: m.portion,
+					})),
+				},
+			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -95,23 +125,44 @@ export const createSchedule = (
 		return next(error);
 	}
 
-	const schedule = new MonthlyCookingSchedule({
-		householdId,
-		name,
-		start,
-		end,
-		meals: meals || [],
-	});
+	const mealList: any[] = meals || [];
 
-	schedule
-		.save()
+	prisma.monthlyCookingSchedule
+		.create({
+			data: {
+				householdId,
+				name,
+				start: new Date(start),
+				end: new Date(end),
+				meals: {
+					create: mealList.map((m: any) => ({
+						recipeId: m.recipe,
+						mealType: m.mealType,
+						start: new Date(m.start),
+						end: new Date(m.end),
+						portion: m.portion,
+					})),
+				},
+			},
+			include: { meals: true },
+		})
 		.then((result) => {
 			res.status(201).json({
 				message: "Schedule created!",
-				schedule: result,
+				schedule: {
+					...toMongoDoc(result),
+					meals: result.meals.map((m) => ({
+						_id: m.id,
+						start: m.start,
+						end: m.end,
+						mealType: m.mealType,
+						recipe: m.recipeId,
+						portion: m.portion,
+					})),
+				},
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -137,26 +188,65 @@ export const updateSchedule = (
 		return next(error);
 	}
 
-	MonthlyCookingSchedule.findOne({ _id: scheduleId, householdId })
+	prisma.monthlyCookingSchedule
+		.findFirst({ where: { id: scheduleId, householdId } })
 		.then((schedule) => {
 			if (!schedule) {
 				const error = new Error("Schedule not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			if (name !== undefined) schedule.name = name;
-			if (start !== undefined) schedule.start = start;
-			if (end !== undefined) schedule.end = end;
-			if (meals !== undefined) schedule.meals = meals;
-			return schedule.save();
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Schedule updated successfully",
-				schedule: updated,
+
+			const updateData: any = {};
+			if (name !== undefined) updateData.name = name;
+			if (start !== undefined) updateData.start = new Date(start);
+			if (end !== undefined) updateData.end = new Date(end);
+
+			if (meals !== undefined) {
+				return prisma.$transaction([
+					prisma.meal.deleteMany({ where: { scheduleId } }),
+					prisma.monthlyCookingSchedule.update({
+						where: { id: scheduleId },
+						data: {
+							...updateData,
+							meals: {
+								create: (meals as any[]).map((m: any) => ({
+									recipeId: m.recipe,
+									mealType: m.mealType,
+									start: new Date(m.start),
+									end: new Date(m.end),
+									portion: m.portion,
+								})),
+							},
+						},
+						include: { meals: true },
+					}),
+				]).then(([, updated]) => updated);
+			}
+
+			return prisma.monthlyCookingSchedule.update({
+				where: { id: scheduleId },
+				data: updateData,
+				include: { meals: true },
 			});
 		})
-		.catch((err) => {
+		.then((updated: any) => {
+			res.status(200).json({
+				message: "Schedule updated successfully",
+				schedule: {
+					...toMongoDoc(updated),
+					meals: updated.meals.map((m: any) => ({
+						_id: m.id,
+						start: m.start,
+						end: m.end,
+						mealType: m.mealType,
+						recipe: m.recipeId,
+						portion: m.portion,
+					})),
+				},
+			});
+		})
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -182,16 +272,20 @@ export const deleteSchedule = (
 		return next(error);
 	}
 
-	MonthlyCookingSchedule.findOneAndDelete({ _id: scheduleId, householdId })
-		.then((result) => {
-			if (!result) {
+	prisma.monthlyCookingSchedule
+		.findFirst({ where: { id: scheduleId, householdId } })
+		.then((schedule) => {
+			if (!schedule) {
 				const error = new Error("Schedule not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.monthlyCookingSchedule.delete({ where: { id: scheduleId } });
+		})
+		.then(() => {
 			res.status(200).json({ message: "Schedule deleted successfully" });
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});

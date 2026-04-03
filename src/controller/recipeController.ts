@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-import Recipe from "../models/recipe";
-import Shelf from "../models/shelf";
+import { prisma } from "../lib/prisma";
+import { toMongoDoc } from "../lib/serialize";
 
 export const getRecipes = (
 	req: Request,
@@ -23,21 +23,27 @@ export const getRecipes = (
 		return next(error);
 	}
 
-	Recipe.find({ householdId: householdId })
+	prisma.recipe
+		.findMany({ where: { householdId }, include: { ingredients: true } })
 		.then((recipes) => {
 			res.status(200).json({
 				recipes: recipes.map((recipe) => ({
-					_id: recipe._id,
+					_id: recipe.id,
 					householdId: recipe.householdId,
 					name: recipe.name,
 					type: recipe.type,
-					ingredients: recipe.ingredients,
+					ingredients: recipe.ingredients.map((ing) => ({
+						_id: ing.id,
+						quantity: ing.quantity,
+						unit: ing.unit,
+						item: ing.itemId,
+					})),
 					portion: recipe.portion,
 					description: recipe.description,
 				})),
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -64,7 +70,8 @@ export const getRecipe = (
 		return next(error);
 	}
 
-	Recipe.findById(recipeId)
+	prisma.recipe
+		.findUnique({ where: { id: recipeId }, include: { ingredients: true } })
 		.then((recipe) => {
 			if (!recipe) {
 				const error = new Error("Recipe not found") as any;
@@ -73,17 +80,22 @@ export const getRecipe = (
 			}
 			res.status(200).json({
 				recipe: {
-					_id: recipe._id,
+					_id: recipe.id,
 					householdId: recipe.householdId,
 					name: recipe.name,
 					type: recipe.type,
-					ingredients: recipe.ingredients,
+					ingredients: recipe.ingredients.map((ing) => ({
+						_id: ing.id,
+						quantity: ing.quantity,
+						unit: ing.unit,
+						item: ing.itemId,
+					})),
 					portion: recipe.portion,
 					description: recipe.description,
 				},
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -120,24 +132,41 @@ export const createRecipe = (
 		return next(error);
 	}
 
-	const recipe = new Recipe({
-		householdId,
-		name,
-		type,
-		ingredients: ingredients || [],
-		portion,
-		description,
-	});
+	const ingList: any[] = ingredients || [];
 
-	recipe
-		.save()
+	prisma.recipe
+		.create({
+			data: {
+				householdId,
+				name,
+				type,
+				portion,
+				description,
+				ingredients: {
+					create: ingList.map((ing: any) => ({
+						itemId: ing.item,
+						quantity: ing.quantity,
+						unit: ing.unit,
+					})),
+				},
+			},
+			include: { ingredients: true },
+		})
 		.then((result) => {
 			res.status(201).json({
 				message: "Recipe created!",
-				recipe: result,
+				recipe: {
+					...toMongoDoc(result),
+					ingredients: result.ingredients.map((ing) => ({
+						_id: ing.id,
+						quantity: ing.quantity,
+						unit: ing.unit,
+						item: ing.itemId,
+					})),
+				},
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -168,27 +197,62 @@ export const updateRecipe = (
 		return next(error);
 	}
 
-	Recipe.findById(recipeId)
+	prisma.recipe
+		.findUnique({ where: { id: recipeId } })
 		.then((recipe) => {
 			if (!recipe) {
 				const error = new Error("Recipe not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
-			if (name !== undefined) recipe.name = name;
-			if (type !== undefined) recipe.type = type;
-			if (ingredients !== undefined) recipe.ingredients = ingredients;
-			if (portion !== undefined) recipe.portion = portion;
-			if (description !== undefined) recipe.description = description;
-			return recipe.save();
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Recipe updated successfully",
-				recipe: updated,
+
+			const updateData: any = {};
+			if (name !== undefined) updateData.name = name;
+			if (type !== undefined) updateData.type = type;
+			if (portion !== undefined) updateData.portion = portion;
+			if (description !== undefined) updateData.description = description;
+
+			if (ingredients !== undefined) {
+				return prisma.$transaction([
+					prisma.ingredient.deleteMany({ where: { recipeId } }),
+					prisma.recipe.update({
+						where: { id: recipeId },
+						data: {
+							...updateData,
+							ingredients: {
+								create: (ingredients as any[]).map((ing: any) => ({
+									itemId: ing.item,
+									quantity: ing.quantity,
+									unit: ing.unit,
+								})),
+							},
+						},
+						include: { ingredients: true },
+					}),
+				]).then(([, updated]) => updated);
+			}
+
+			return prisma.recipe.update({
+				where: { id: recipeId },
+				data: updateData,
+				include: { ingredients: true },
 			});
 		})
-		.catch((err) => {
+		.then((updated: any) => {
+			res.status(200).json({
+				message: "Recipe updated successfully",
+				recipe: {
+					...toMongoDoc(updated),
+					ingredients: updated.ingredients.map((ing: any) => ({
+						_id: ing.id,
+						quantity: ing.quantity,
+						unit: ing.unit,
+						item: ing.itemId,
+					})),
+				},
+			});
+		})
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -217,8 +281,15 @@ export const getMissingIngredients = (
 
 	let foundRecipe: any;
 
-	Recipe.findById(recipeId)
-		.populate("ingredients.item", "_id name")
+	prisma.recipe
+		.findUnique({
+			where: { id: recipeId },
+			include: {
+				ingredients: {
+					include: { item: { select: { id: true, name: true } } },
+				},
+			},
+		})
 		.then((recipe) => {
 			if (!recipe) {
 				const error = new Error("Recipe not found") as any;
@@ -226,28 +297,28 @@ export const getMissingIngredients = (
 				throw error;
 			}
 			foundRecipe = recipe;
-			return Shelf.find({ householdId });
+			return prisma.shelfItem.findMany({
+				where: { shelf: { householdId } },
+			});
 		})
-		.then((shelves) => {
+		.then((shelfItems) => {
 			// Build a map: itemId -> { [unit_lower]: totalQuantity }
 			const shelfTotals = new Map<string, Map<string, number>>();
 
-			for (const shelf of shelves) {
-				for (const shelfItem of shelf.items) {
-					const itemId = shelfItem.item.toString();
-					const unit = (shelfItem.unit || "").toLowerCase();
-					if (!shelfTotals.has(itemId)) {
-						shelfTotals.set(itemId, new Map());
-					}
-					const unitMap = shelfTotals.get(itemId)!;
-					unitMap.set(unit, (unitMap.get(unit) || 0) + shelfItem.quantity);
+			for (const si of shelfItems) {
+				const itemId = si.itemId;
+				const unit = (si.unit || "").toLowerCase();
+				if (!shelfTotals.has(itemId)) {
+					shelfTotals.set(itemId, new Map());
 				}
+				const unitMap = shelfTotals.get(itemId)!;
+				unitMap.set(unit, (unitMap.get(unit) || 0) + si.quantity);
 			}
 
-			const missing: { item: { _id: any; name: any }; amount: number; unit: string }[] = [];
+			const missing: { item: { _id: string; name: any }; amount: number; unit: string }[] = [];
 
 			for (const ingredient of foundRecipe.ingredients) {
-				const itemId = (ingredient.item._id ?? ingredient.item).toString();
+				const itemId = ingredient.item.id;
 				const requiredUnit = ingredient.unit.toLowerCase();
 				const requiredAmount = ingredient.quantity;
 
@@ -255,12 +326,8 @@ export const getMissingIngredients = (
 				const shelfAmount = unitMap ? (unitMap.get(requiredUnit) || 0) : 0;
 
 				if (shelfAmount < requiredAmount) {
-					const populatedItem = ingredient.item;
 					missing.push({
-						item: {
-							_id: populatedItem._id ?? populatedItem,
-							name: populatedItem.name ?? undefined,
-						},
+						item: { _id: ingredient.item.id, name: ingredient.item.name },
 						amount: requiredAmount,
 						unit: ingredient.unit,
 					});
@@ -269,7 +336,7 @@ export const getMissingIngredients = (
 
 			res.status(200).json(missing);
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
@@ -288,18 +355,22 @@ export const deleteRecipe = (
 		return next(error);
 	}
 
-	Recipe.findByIdAndDelete(recipeId)
-		.then((result) => {
-			if (!result) {
+	prisma.recipe
+		.findUnique({ where: { id: recipeId } })
+		.then((recipe) => {
+			if (!recipe) {
 				const error = new Error("Recipe not found") as any;
 				error.statusCode = 404;
 				throw error;
 			}
+			return prisma.recipe.delete({ where: { id: recipeId } });
+		})
+		.then(() => {
 			res.status(200).json({
 				message: "Recipe deleted successfully",
 			});
 		})
-		.catch((err) => {
+		.catch((err: any) => {
 			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
