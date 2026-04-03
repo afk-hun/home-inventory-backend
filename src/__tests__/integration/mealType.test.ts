@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
-import mongoose from "mongoose";
+import { prisma } from "../../lib/prisma";
 import app from "../../app";
-import User from "../../models/user";
-import Household from "../../models/household";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -20,24 +18,14 @@ async function getCsrf() {
 /** Creates a user + household in DB, logs in via HTTP, returns the user. */
 async function loginAsNewUser(email: string, password = "password123") {
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "Meal Type User",
-		email,
-		password: hashed,
-	}).save();
-
-	await new Household({
-		name: "Meal Type Household",
-		owner: user,
-		members: [user],
-	}).save();
-
+	const user = await prisma.user.create({ data: { name: "Meal Type User", email, password: hashed } });
+	const _hh = await prisma.household.create({ data: { name: "Meal Type Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: _hh.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")
 		.set("x-csrf-token", csrf)
 		.send({ email, password });
-
 	return user;
 }
 
@@ -167,7 +155,7 @@ describe("PATCH /meal/meal-type", () => {
 		const res = await agent
 			.patch("/meal/meal-type")
 			.set("x-csrf-token", csrf)
-			.send({ mealTypeId: new mongoose.Types.ObjectId().toHexString(), name: "Ghost" });
+			.send({ mealTypeId: "nonexistent-id", name: "Ghost" });
 		expect(res.status).toBe(401);
 	});
 
@@ -188,14 +176,14 @@ describe("PATCH /meal/meal-type", () => {
 		const res = await agent
 			.patch("/meal/meal-type")
 			.set("x-csrf-token", csrf)
-			.send({ mealTypeId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ mealTypeId: "nonexistent-id" });
 
 		expect(res.status).toBe(400);
 	});
 
 	it("returns 404 for a non-existent mealTypeId", async () => {
 		await loginAsNewUser("mt-patch-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.patch("/meal/meal-type")
@@ -266,7 +254,7 @@ describe("DELETE /meal/meal-type", () => {
 		const res = await agent
 			.delete("/meal/meal-type")
 			.set("x-csrf-token", csrf)
-			.send({ mealTypeId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ mealTypeId: "nonexistent-id" });
 		expect(res.status).toBe(401);
 	});
 
@@ -283,7 +271,7 @@ describe("DELETE /meal/meal-type", () => {
 
 	it("returns 404 for a non-existent mealTypeId", async () => {
 		await loginAsNewUser("mt-delete-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.delete("/meal/meal-type")

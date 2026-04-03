@@ -1,14 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("../../../models/unitType", () => ({
-	default: {
-		find: vi.fn(),
-		findById: vi.fn(),
-		findByIdAndDelete: vi.fn(),
+vi.mock("../../../lib/prisma", () => ({
+	prisma: {
+		unitType: {
+			findMany: vi.fn(),
+			findUnique: vi.fn(),
+			create: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+		},
 	},
 }));
 
-import UnitType from "../../../models/unitType";
+import { prisma } from "../../../lib/prisma";
 import {
 	getUnitTypes,
 	createUnitType,
@@ -41,7 +45,7 @@ describe("getUnitTypes", () => {
 	});
 
 	it("returns 404 when householdId is missing", () => {
-		const req: any = { user: { _id: "u1" }, householdId: undefined };
+		const req: any = { user: { id: "u1" }, householdId: undefined };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -54,12 +58,12 @@ describe("getUnitTypes", () => {
 
 	it("returns mapped unit types on success", async () => {
 		const mockDocs = [
-			{ _id: "ut1", name: "Kilogram", householdId: "h1" },
-			{ _id: "ut2", name: "Litre", householdId: "h1" },
+			{ id: "ut1", name: "Kilogram", householdId: "h1" },
+			{ id: "ut2", name: "Litre", householdId: "h1" },
 		];
-		(UnitType.find as any).mockResolvedValue(mockDocs);
+		(prisma.unitType.findMany as any).mockResolvedValue(mockDocs);
 
-		const req: any = { user: { _id: "u1" }, householdId: "h1" };
+		const req: any = { user: { id: "u1" }, householdId: "h1" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -68,7 +72,7 @@ describe("getUnitTypes", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
 		expect(res.json).toHaveBeenCalledWith({
 			unitTypes: mockDocs.map((d) => ({
-				_id: d._id,
+				_id: d.id,
 				name: d.name,
 				householdId: d.householdId,
 			})),
@@ -76,9 +80,9 @@ describe("getUnitTypes", () => {
 	});
 
 	it("calls next with 500 on DB error", async () => {
-		(UnitType.find as any).mockRejectedValue(new Error("DB error"));
+		(prisma.unitType.findMany as any).mockRejectedValue(new Error("DB error"));
 
-		const req: any = { user: { _id: "u1" }, householdId: "h1" };
+		const req: any = { user: { id: "u1" }, householdId: "h1" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -98,7 +102,7 @@ describe("getUnitTypes", () => {
 
 describe("createUnitType", () => {
 	it("returns 400 when name is missing", () => {
-		const req: any = { body: {}, user: { _id: "u1" }, householdId: "h1" };
+		const req: any = { body: {}, user: { id: "u1" }, householdId: "h1" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -128,7 +132,7 @@ describe("createUnitType", () => {
 	it("returns 400 when householdId is missing", () => {
 		const req: any = {
 			body: { name: "Gram" },
-			user: { _id: "u1" },
+			user: { id: "u1" },
 			householdId: undefined,
 		};
 		const res = makeMockRes();
@@ -175,10 +179,10 @@ describe("renameUnitType", () => {
 	});
 
 	it("returns 404 when unit type is not found", async () => {
-		(UnitType.findById as any).mockResolvedValue(null);
+		(prisma.unitType.findUnique as any).mockResolvedValue(null);
 
 		const req: any = {
-			body: { unitTypeId: "000000000000000000000001", name: "Ghost" },
+			body: { unitTypeId: "ut1", name: "Ghost" },
 			householdId: "h1",
 		};
 		const res = makeMockRes();
@@ -194,13 +198,10 @@ describe("renameUnitType", () => {
 	});
 
 	it("renames and returns 200 on success", async () => {
-		const mockDoc = {
-			_id: "ut1",
-			name: "Old Name",
-			householdId: "h1",
-			save: vi.fn().mockResolvedValue({ _id: "ut1" }),
-		};
-		(UnitType.findById as any).mockResolvedValue(mockDoc);
+		const existingDoc = { id: "ut1", name: "Old Name", householdId: "h1" };
+		const updatedDoc = { id: "ut1", name: "New Name", householdId: "h1" };
+		(prisma.unitType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.unitType.update as any).mockResolvedValue(updatedDoc);
 
 		const req: any = {
 			body: { unitTypeId: "ut1", name: "New Name" },
@@ -212,9 +213,11 @@ describe("renameUnitType", () => {
 		renameUnitType(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(mockDoc.name).toBe("New Name");
 		expect(res.json).toHaveBeenCalledWith(
 			expect.objectContaining({ message: "Unit type renamed successfully" }),
+		);
+		expect(prisma.unitType.update).toHaveBeenCalledWith(
+			expect.objectContaining({ data: { name: "New Name" } }),
 		);
 	});
 });
@@ -237,7 +240,7 @@ describe("deleteUnitType", () => {
 	});
 
 	it("returns 404 when unit type is not found", async () => {
-		(UnitType.findByIdAndDelete as any).mockResolvedValue(null);
+		(prisma.unitType.findUnique as any).mockResolvedValue(null);
 
 		const req: any = { body: { unitTypeId: "nonexistent" } };
 		const res = makeMockRes();
@@ -253,7 +256,9 @@ describe("deleteUnitType", () => {
 	});
 
 	it("returns 200 on successful deletion", async () => {
-		(UnitType.findByIdAndDelete as any).mockResolvedValue({ _id: "ut1" });
+		const existingDoc = { id: "ut1", name: "Kilogram", householdId: "h1" };
+		(prisma.unitType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.unitType.delete as any).mockResolvedValue(existingDoc);
 
 		const req: any = { body: { unitTypeId: "ut1" } };
 		const res = makeMockRes();

@@ -1,27 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Module-level save mock — tests can replace the resolved value as needed
-let mockSave = vi.fn();
+vi.mock("../../../lib/prisma", () => ({
+	prisma: {
+		itemType: {
+			findMany: vi.fn(),
+			findUnique: vi.fn(),
+			create: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+		},
+	},
+}));
 
-vi.mock("../../../models/itemType", () => {
-	const find = vi.fn();
-	const findById = vi.fn();
-	const findByIdAndDelete = vi.fn();
-
-	// Must be a regular function (not arrow) so `new ItemType(...)` works.
-	const MockItemType = vi.fn(function MockItemTypeImpl(this: any, data: any) {
-		Object.assign(this, data);
-		this.save = (...args: any[]) => mockSave(...args);
-	});
-
-	(MockItemType as any).find = find;
-	(MockItemType as any).findById = findById;
-	(MockItemType as any).findByIdAndDelete = findByIdAndDelete;
-
-	return { default: MockItemType };
-});
-
-import ItemType from "../../../models/itemType";
+import { prisma } from "../../../lib/prisma";
 import {
 	getItemTypes,
 	createItemType,
@@ -43,7 +34,6 @@ const makeMockRes = () => {
 describe("getItemTypes", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.user is missing", () => {
@@ -60,7 +50,7 @@ describe("getItemTypes", () => {
 	});
 
 	it("calls next with 404 when householdId is missing", () => {
-		const req: any = { user: { _id: "user-1" }, householdId: undefined };
+		const req: any = { user: { id: "user-1" }, householdId: undefined };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -74,12 +64,12 @@ describe("getItemTypes", () => {
 
 	it("returns 200 with itemTypes array on happy path", async () => {
 		const mockDocs = [
-			{ _id: "it-1", name: "Electronics", householdId: "hh-1" },
-			{ _id: "it-2", name: "Furniture", householdId: "hh-1" },
+			{ id: "it-1", name: "Electronics", householdId: "hh-1" },
+			{ id: "it-2", name: "Furniture", householdId: "hh-1" },
 		];
-		(ItemType.find as any).mockResolvedValue(mockDocs);
+		(prisma.itemType.findMany as any).mockResolvedValue(mockDocs);
 
-		const req: any = { user: { _id: "user-1" }, householdId: "hh-1" };
+		const req: any = { user: { id: "user-1" }, householdId: "hh-1" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -88,7 +78,7 @@ describe("getItemTypes", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
 		expect(res.json).toHaveBeenCalledWith({
 			itemTypes: mockDocs.map((d) => ({
-				_id: d._id,
+				_id: d.id,
 				name: d.name,
 				householdId: d.householdId,
 			})),
@@ -104,13 +94,12 @@ describe("getItemTypes", () => {
 describe("createItemType", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 400 when name is missing", () => {
 		const req: any = {
 			body: {},
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 		};
 		const res = makeMockRes();
@@ -144,7 +133,7 @@ describe("createItemType", () => {
 	it("calls next with 400 when householdId is missing", () => {
 		const req: any = {
 			body: { name: "Books" },
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: undefined,
 		};
 		const res = makeMockRes();
@@ -160,15 +149,15 @@ describe("createItemType", () => {
 
 	it("returns 201 with itemType on happy path", async () => {
 		const savedDoc = {
-			_id: "it-new",
+			id: "it-new",
 			name: "Books",
 			householdId: "hh-1",
 		};
-		mockSave = vi.fn().mockResolvedValue(savedDoc);
+		(prisma.itemType.create as any).mockResolvedValue(savedDoc);
 
 		const req: any = {
 			body: { name: "Books" },
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 		};
 		const res = makeMockRes();
@@ -179,7 +168,7 @@ describe("createItemType", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
 		expect(res.json).toHaveBeenCalledWith({
 			message: "Item type created!",
-			itemType: savedDoc,
+			itemType: { _id: "it-new", name: "Books", householdId: "hh-1" },
 		});
 		expect(next).not.toHaveBeenCalled();
 	});
@@ -192,7 +181,6 @@ describe("createItemType", () => {
 describe("renameItemType", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 400 when householdId is missing", () => {
@@ -243,8 +231,8 @@ describe("renameItemType", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when findById returns null", async () => {
-		(ItemType.findById as any).mockResolvedValue(null);
+	it("calls next with 404 when itemType is not found", async () => {
+		(prisma.itemType.findUnique as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -264,13 +252,11 @@ describe("renameItemType", () => {
 	});
 
 	it("returns 200 with itemTypeId on happy path", async () => {
-		const updatedDoc = { _id: "it-1", name: "Renamed" };
-		const mockFoundDoc: any = {
-			_id: "it-1",
-			name: "Old Name",
-			save: vi.fn().mockResolvedValue(updatedDoc),
-		};
-		(ItemType.findById as any).mockResolvedValue(mockFoundDoc);
+		const existingDoc = { id: "it-1", name: "Old Name", householdId: "hh-1" };
+		const updatedDoc = { id: "it-1", name: "Renamed", householdId: "hh-1" };
+
+		(prisma.itemType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.itemType.update as any).mockResolvedValue(updatedDoc);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -284,7 +270,7 @@ describe("renameItemType", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
 		expect(res.json).toHaveBeenCalledWith({
 			message: "Item type renamed successfully",
-			itemTypeId: updatedDoc._id,
+			itemTypeId: "it-1",
 		});
 		expect(next).not.toHaveBeenCalled();
 	});
@@ -297,7 +283,6 @@ describe("renameItemType", () => {
 describe("deleteItemType", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 400 when itemTypeId is missing", () => {
@@ -313,8 +298,8 @@ describe("deleteItemType", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when findByIdAndDelete returns null", async () => {
-		(ItemType.findByIdAndDelete as any).mockResolvedValue(null);
+	it("calls next with 404 when itemType is not found", async () => {
+		(prisma.itemType.findUnique as any).mockResolvedValue(null);
 
 		const req: any = { body: { itemTypeId: "nonexistent-id" } };
 		const res = makeMockRes();
@@ -331,8 +316,9 @@ describe("deleteItemType", () => {
 	});
 
 	it("returns 200 on successful deletion", async () => {
-		const deletedDoc = { _id: "it-1", name: "Electronics", householdId: "hh-1" };
-		(ItemType.findByIdAndDelete as any).mockResolvedValue(deletedDoc);
+		const existingDoc = { id: "it-1", name: "Electronics", householdId: "hh-1" };
+		(prisma.itemType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.itemType.delete as any).mockResolvedValue(existingDoc);
 
 		const req: any = { body: { itemTypeId: "it-1" } };
 		const res = makeMockRes();

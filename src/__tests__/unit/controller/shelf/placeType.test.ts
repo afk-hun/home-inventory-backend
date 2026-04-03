@@ -1,16 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("../../../../models/shelfPlaceType", () => {
-	return {
-		default: {
-			find: vi.fn(),
-			findById: vi.fn(),
-			findByIdAndDelete: vi.fn(),
+vi.mock("../../../../lib/prisma", () => ({
+	prisma: {
+		shelfPlaceType: {
+			findMany: vi.fn(),
+			findUnique: vi.fn(),
+			create: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
 		},
-	};
-});
+	},
+}));
 
-import ShelfPlaceType from "../../../../models/shelfPlaceType";
+import { prisma } from "../../../../lib/prisma";
 import {
 	getShelfPlaceTypes,
 	createShelfPlaceType,
@@ -39,7 +41,7 @@ describe("getShelfPlaceTypes", () => {
 	});
 
 	it("returns 404 when householdId is missing", () => {
-		const req: any = { user: { _id: "u1" }, householdId: undefined };
+		const req: any = { user: { id: "u1" }, householdId: undefined };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -52,11 +54,11 @@ describe("getShelfPlaceTypes", () => {
 
 	it("returns mapped shelf place types on success", async () => {
 		const mockDocs = [
-			{ _id: "spt1", name: "Top Shelf", householdId: "h1" },
+			{ id: "spt1", name: "Top Shelf", householdId: "h1" },
 		];
-		(ShelfPlaceType.find as any).mockResolvedValue(mockDocs);
+		(prisma.shelfPlaceType.findMany as any).mockResolvedValue(mockDocs);
 
-		const req: any = { user: { _id: "u1" }, householdId: "h1" };
+		const req: any = { user: { id: "u1" }, householdId: "h1" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -65,7 +67,7 @@ describe("getShelfPlaceTypes", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
 		expect(res.json).toHaveBeenCalledWith({
 			shelfPlaces: mockDocs.map((d) => ({
-				_id: d._id,
+				_id: d.id,
 				name: d.name,
 				householdId: d.householdId,
 			})),
@@ -74,20 +76,41 @@ describe("getShelfPlaceTypes", () => {
 });
 
 describe("createShelfPlaceType", () => {
-	it("returns 400 when name is missing", async () => {
+	it("returns 400 when name is missing", () => {
 		const req: any = {
 			body: {},
-			user: { _id: "u1" },
+			user: { id: "u1" },
 			householdId: "h1",
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
 
-		await createShelfPlaceType(req, res, next);
+		createShelfPlaceType(req, res, next);
 
 		expect(next).toHaveBeenCalledWith(
 			expect.objectContaining({ statusCode: 400 }),
 		);
+	});
+
+	it("returns 201 with shelfPlaceType on success", async () => {
+		const savedDoc = { id: "spt-new", name: "Bottom", householdId: "h1" };
+		(prisma.shelfPlaceType.create as any).mockResolvedValue(savedDoc);
+
+		const req: any = {
+			body: { name: "Bottom" },
+			user: { id: "u1" },
+			householdId: "h1",
+		};
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		createShelfPlaceType(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
+		expect(res.json).toHaveBeenCalledWith({
+			message: "Shelf place type created!",
+			shelfPlaceType: { _id: "spt-new", name: "Bottom", householdId: "h1" },
+		});
 	});
 });
 
@@ -105,7 +128,7 @@ describe("renameShelfPlaceType", () => {
 	});
 
 	it("returns 404 when shelf place type is not found", async () => {
-		(ShelfPlaceType.findById as any).mockResolvedValue(null);
+		(prisma.shelfPlaceType.findUnique as any).mockResolvedValue(null);
 
 		const req: any = {
 			body: { shelfPlaceTypeId: "nonexistent", name: "New Name" },
@@ -121,6 +144,29 @@ describe("renameShelfPlaceType", () => {
 				expect.objectContaining({ statusCode: 404 }),
 			),
 		);
+	});
+
+	it("returns 200 with shelfPlaceTypeId on success", async () => {
+		const existingDoc = { id: "spt-1", name: "Old", householdId: "h1" };
+		const updatedDoc = { id: "spt-1", name: "New Name", householdId: "h1" };
+
+		(prisma.shelfPlaceType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.shelfPlaceType.update as any).mockResolvedValue(updatedDoc);
+
+		const req: any = {
+			body: { shelfPlaceTypeId: "spt-1", name: "New Name" },
+			householdId: "h1",
+		};
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		renameShelfPlaceType(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		expect(res.json).toHaveBeenCalledWith({
+			message: "Shelf place type renamed successfully",
+			shelfPlaceTypeId: "spt-1",
+		});
 	});
 });
 
@@ -138,7 +184,7 @@ describe("deleteShelfPlaceType", () => {
 	});
 
 	it("returns 404 when shelf place type is not found", async () => {
-		(ShelfPlaceType.findByIdAndDelete as any).mockResolvedValue(null);
+		(prisma.shelfPlaceType.findUnique as any).mockResolvedValue(null);
 
 		const req: any = { body: { shelfPlaceTypeId: "nonexistent" } };
 		const res = makeMockRes();
@@ -151,5 +197,22 @@ describe("deleteShelfPlaceType", () => {
 				expect.objectContaining({ statusCode: 404 }),
 			),
 		);
+	});
+
+	it("returns 200 on successful deletion", async () => {
+		const existingDoc = { id: "spt-1", name: "Top Shelf", householdId: "h1" };
+		(prisma.shelfPlaceType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.shelfPlaceType.delete as any).mockResolvedValue(existingDoc);
+
+		const req: any = { body: { shelfPlaceTypeId: "spt-1" } };
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		deleteShelfPlaceType(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		expect(res.json).toHaveBeenCalledWith({
+			message: "Shelf place type deleted successfully",
+		});
 	});
 });

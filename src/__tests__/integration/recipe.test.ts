@@ -1,12 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
-import mongoose from "mongoose";
+import { prisma } from "../../lib/prisma";
 import app from "../../app";
-import User from "../../models/user";
-import Household from "../../models/household";
-import Item from "../../models/item";
-import Shelf from "../../models/shelf";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -22,48 +18,28 @@ async function getCsrf() {
 /** Creates a user + household in DB, logs in via HTTP, returns the user. */
 async function loginAsNewUser(email: string, password = "password123") {
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "Recipe Test User",
-		email,
-		password: hashed,
-	}).save();
-
-	await new Household({
-		name: "Recipe Test Household",
-		owner: user,
-		members: [user],
-	}).save();
-
+	const user = await prisma.user.create({ data: { name: "Recipe Test User", email, password: hashed } });
+	const _hh = await prisma.household.create({ data: { name: "Recipe Test Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: _hh.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")
 		.set("x-csrf-token", csrf)
 		.send({ email, password });
-
 	return user;
 }
 
 /** Creates a user + household in DB, logs in via HTTP, returns both user and household. */
 async function loginAsNewUserWithHousehold(email: string, password = "password123") {
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "Recipe Test User",
-		email,
-		password: hashed,
-	}).save();
-
-	const household = await new Household({
-		name: "Recipe Test Household",
-		owner: user,
-		members: [user],
-	}).save();
-
+	const user = await prisma.user.create({ data: { name: "Recipe Test User", email, password: hashed } });
+	const household = await prisma.household.create({ data: { name: "Recipe Test Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: household.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")
 		.set("x-csrf-token", csrf)
 		.send({ email, password });
-
 	return { user, household };
 }
 
@@ -101,7 +77,7 @@ describe("GET /recipe/recipes", () => {
 describe("GET /recipe/recipes/:id", () => {
 	it("returns 401 when not authenticated", async () => {
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const res = await agent
 			.get(`/recipe/recipes/${fakeId}`)
 			.set("x-csrf-token", csrf);
@@ -110,7 +86,7 @@ describe("GET /recipe/recipes/:id", () => {
 
 	it("returns 404 for a non-existent recipe id", async () => {
 		await loginAsNewUser("rec-get-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.get(`/recipe/recipes/${fakeId}`)
@@ -170,7 +146,14 @@ describe("POST /recipe/recipes", () => {
 
 	it("returns 201 with correct body shape on valid create", async () => {
 		await loginAsNewUser("rec-create-201@test.com");
-		const csrf = await getCsrf();
+
+		// Create a real item first (FK constraint on Ingredient.itemId)
+		let csrf = await getCsrf();
+		const itemRes = await agent.post("/shelf/item").set("x-csrf-token", csrf).send({ name: "Flour" });
+		expect(itemRes.status).toBe(201);
+		const itemId = itemRes.body.item._id;
+
+		csrf = await getCsrf();
 		const res = await agent
 			.post("/recipe/recipes")
 			.set("x-csrf-token", csrf)
@@ -181,7 +164,7 @@ describe("POST /recipe/recipes", () => {
 					{
 						quantity: 2,
 						unit: "cup",
-						item: "507f1f77bcf86cd799439011",
+						item: itemId,
 					},
 				],
 				portion: 4,
@@ -222,7 +205,7 @@ describe("POST /recipe/recipes", () => {
 describe("PATCH /recipe/recipes", () => {
 	it("returns 401 when not authenticated", async () => {
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const res = await agent
 			.patch("/recipe/recipes")
 			.set("x-csrf-token", csrf)
@@ -243,7 +226,7 @@ describe("PATCH /recipe/recipes", () => {
 
 	it("returns 404 for a non-existent recipeId", async () => {
 		await loginAsNewUser("rec-patch-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.patch("/recipe/recipes")
@@ -296,7 +279,7 @@ describe("PATCH /recipe/recipes", () => {
 describe("DELETE /recipe/recipes", () => {
 	it("returns 401 when not authenticated", async () => {
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const res = await agent
 			.delete("/recipe/recipes")
 			.set("x-csrf-token", csrf)
@@ -317,7 +300,7 @@ describe("DELETE /recipe/recipes", () => {
 
 	it("returns 404 for a non-existent recipeId", async () => {
 		await loginAsNewUser("rec-delete-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.delete("/recipe/recipes")
@@ -402,7 +385,7 @@ describe("DELETE /recipe/recipes", () => {
 describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 	it("returns 401 when not authenticated", async () => {
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const res = await agent
 			.get(`/recipe/recipes/${fakeId}/missing-ingredients`)
 			.set("x-csrf-token", csrf);
@@ -411,7 +394,7 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 
 	it("returns 404 for a non-existent recipe id", async () => {
 		await loginAsNewUser("rec-missing-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.get(`/recipe/recipes/${fakeId}/missing-ingredients`)
@@ -423,11 +406,7 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 		const { household } = await loginAsNewUserWithHousehold("rec-missing-all@test.com");
 
 		// Create an item directly in DB
-		const item = await new Item({
-			householdId: household._id,
-			name: "Flour",
-			connectedStores: [],
-		}).save();
+		const item = await prisma.item.create({ data: { name: "Flour", householdId: household.id } });
 
 		// Create a recipe with one ingredient
 		const createCsrf = await getCsrf();
@@ -436,7 +415,7 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 			.set("x-csrf-token", createCsrf)
 			.send({
 				name: "Bread",
-				ingredients: [{ quantity: 500, unit: "g", item: item._id.toString() }],
+				ingredients: [{ quantity: 500, unit: "g", item: item.id }],
 			});
 		expect(createRes.status).toBe(201);
 		const recipeId = createRes.body.recipe._id;
@@ -451,25 +430,18 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 		expect(res.body).toHaveLength(1);
 		expect(res.body[0].amount).toBe(500);
 		expect(res.body[0].unit).toBe("g");
-		expect(res.body[0].item._id).toBe(item._id.toString());
+		expect(res.body[0].item._id).toBe(item.id);
 		expect(res.body[0].item.name).toBe("Flour");
 	});
 
 	it("returns 200 with empty array when all ingredients are sufficiently stocked", async () => {
 		const { household } = await loginAsNewUserWithHousehold("rec-missing-none@test.com");
 
-		const item = await new Item({
-			householdId: household._id,
-			name: "Sugar",
-			connectedStores: [],
-		}).save();
+		const item = await prisma.item.create({ data: { name: "Sugar", householdId: household.id } });
 
 		// Create a shelf with enough quantity
-		await new Shelf({
-			householdId: household._id,
-			name: "Pantry",
-			items: [{ item: item._id, quantity: 1000, unit: "g" }],
-		}).save();
+		const shelf = await prisma.shelf.create({ data: { name: "Pantry", householdId: household.id } });
+		await prisma.shelfItem.create({ data: { shelfId: shelf.id, itemId: item.id, quantity: 1000, unit: "g" } });
 
 		const createCsrf = await getCsrf();
 		const createRes = await agent
@@ -477,7 +449,7 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 			.set("x-csrf-token", createCsrf)
 			.send({
 				name: "Cake",
-				ingredients: [{ quantity: 200, unit: "g", item: item._id.toString() }],
+				ingredients: [{ quantity: 200, unit: "g", item: item.id }],
 			});
 		expect(createRes.status).toBe(201);
 		const recipeId = createRes.body.recipe._id;
@@ -495,17 +467,10 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 	it("returns full required amount (not the difference) when partially stocked", async () => {
 		const { household } = await loginAsNewUserWithHousehold("rec-missing-partial@test.com");
 
-		const item = await new Item({
-			householdId: household._id,
-			name: "Butter",
-			connectedStores: [],
-		}).save();
+		const item = await prisma.item.create({ data: { name: "Butter", householdId: household.id } });
 
-		await new Shelf({
-			householdId: household._id,
-			name: "Fridge",
-			items: [{ item: item._id, quantity: 100, unit: "g" }],
-		}).save();
+		const shelf = await prisma.shelf.create({ data: { name: "Fridge", householdId: household.id } });
+		await prisma.shelfItem.create({ data: { shelfId: shelf.id, itemId: item.id, quantity: 100, unit: "g" } });
 
 		const createCsrf = await getCsrf();
 		const createRes = await agent
@@ -513,7 +478,7 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 			.set("x-csrf-token", createCsrf)
 			.send({
 				name: "Cookies",
-				ingredients: [{ quantity: 400, unit: "g", item: item._id.toString() }],
+				ingredients: [{ quantity: 400, unit: "g", item: item.id }],
 			});
 		expect(createRes.status).toBe(201);
 		const recipeId = createRes.body.recipe._id;
@@ -532,18 +497,11 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 	it("treats shelf quantity as 0 when units differ", async () => {
 		const { household } = await loginAsNewUserWithHousehold("rec-missing-unit@test.com");
 
-		const item = await new Item({
-			householdId: household._id,
-			name: "Milk",
-			connectedStores: [],
-		}).save();
+		const item = await prisma.item.create({ data: { name: "Milk", householdId: household.id } });
 
 		// Shelf has ml, recipe needs L
-		await new Shelf({
-			householdId: household._id,
-			name: "Fridge",
-			items: [{ item: item._id, quantity: 5000, unit: "ml" }],
-		}).save();
+		const shelf = await prisma.shelf.create({ data: { name: "Fridge", householdId: household.id } });
+		await prisma.shelfItem.create({ data: { shelfId: shelf.id, itemId: item.id, quantity: 5000, unit: "ml" } });
 
 		const createCsrf = await getCsrf();
 		const createRes = await agent
@@ -551,7 +509,7 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 			.set("x-csrf-token", createCsrf)
 			.send({
 				name: "Smoothie",
-				ingredients: [{ quantity: 2, unit: "L", item: item._id.toString() }],
+				ingredients: [{ quantity: 2, unit: "L", item: item.id }],
 			});
 		expect(createRes.status).toBe(201);
 		const recipeId = createRes.body.recipe._id;
@@ -570,23 +528,13 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 	it("sums quantities across multiple shelves for the same item and unit", async () => {
 		const { household } = await loginAsNewUserWithHousehold("rec-missing-multishelf@test.com");
 
-		const item = await new Item({
-			householdId: household._id,
-			name: "Rice",
-			connectedStores: [],
-		}).save();
+		const item = await prisma.item.create({ data: { name: "Rice", householdId: household.id } });
 
 		// Two shelves each with 300g → total 600g
-		await new Shelf({
-			householdId: household._id,
-			name: "Shelf A",
-			items: [{ item: item._id, quantity: 300, unit: "g" }],
-		}).save();
-		await new Shelf({
-			householdId: household._id,
-			name: "Shelf B",
-			items: [{ item: item._id, quantity: 300, unit: "g" }],
-		}).save();
+		const shelfA = await prisma.shelf.create({ data: { name: "Shelf A", householdId: household.id } });
+		await prisma.shelfItem.create({ data: { shelfId: shelfA.id, itemId: item.id, quantity: 300, unit: "g" } });
+		const shelfB = await prisma.shelf.create({ data: { name: "Shelf B", householdId: household.id } });
+		await prisma.shelfItem.create({ data: { shelfId: shelfB.id, itemId: item.id, quantity: 300, unit: "g" } });
 
 		const createCsrf = await getCsrf();
 		const createRes = await agent
@@ -595,7 +543,7 @@ describe("GET /recipe/recipes/:id/missing-ingredients", () => {
 			.send({
 				name: "Rice Pudding",
 				// Needs 500g — shelf total is 600g → sufficient
-				ingredients: [{ quantity: 500, unit: "g", item: item._id.toString() }],
+				ingredients: [{ quantity: 500, unit: "g", item: item.id }],
 			});
 		expect(createRes.status).toBe(201);
 		const recipeId = createRes.body.recipe._id;

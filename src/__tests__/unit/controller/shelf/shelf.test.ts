@@ -1,26 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// ---------------------------------------------------------------------------
-// Mock the Shelf model before importing the controller
-// ---------------------------------------------------------------------------
-vi.mock("../../../../models/shelf", () => {
-	const mockShelf: any = {
-		countDocuments: vi.fn(),
-		find: vi.fn(),
-		findOne: vi.fn(),
-		findOneAndDelete: vi.fn(),
-	};
-	// Constructor mock for createShelf
-	const ShelfConstructor = vi.fn().mockImplementation(function (this: any, data: any) {
-		Object.assign(this, data);
-		this.save = vi.fn();
-	});
-	// Attach static methods to the constructor
-	Object.assign(ShelfConstructor, mockShelf);
-	return { default: ShelfConstructor };
-});
+vi.mock("../../../../lib/prisma", () => ({
+	prisma: {
+		shelf: {
+			count: vi.fn(),
+			findMany: vi.fn(),
+			findFirst: vi.fn(),
+			create: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+		},
+		shelfItem: {
+			findFirst: vi.fn(),
+			create: vi.fn(),
+			delete: vi.fn(),
+		},
+	},
+}));
 
-import Shelf from "../../../../models/shelf";
+import { prisma } from "../../../../lib/prisma";
 import {
 	getShelves,
 	getShelf,
@@ -30,10 +28,6 @@ import {
 	addShelfItem,
 	removeShelfItem,
 } from "../../../../controller/shelf/shelf";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 const makeMockRes = () => {
 	const res: any = {};
@@ -64,13 +58,9 @@ describe("getShelves", () => {
 	});
 
 	it("returns 200 with shelves and pagination on success", async () => {
-		const fakeShelves = [{ _id: "s1", name: "Pantry" }];
-		// countDocuments returns 1
-		(Shelf.countDocuments as any).mockResolvedValue(1);
-		// find().skip().limit() chain
-		const mockSkip = vi.fn().mockReturnThis();
-		const mockLimit = vi.fn().mockResolvedValue(fakeShelves);
-		(Shelf.find as any).mockReturnValue({ skip: mockSkip, limit: mockLimit });
+		const fakeShelves = [{ id: "s1", name: "Pantry", householdId: "h1" }];
+		(prisma.shelf.count as any).mockResolvedValue(1);
+		(prisma.shelf.findMany as any).mockResolvedValue(fakeShelves);
 
 		const req: any = { householdId: "h1", query: { page: "1", limit: "5" } };
 		const res = makeMockRes();
@@ -79,14 +69,13 @@ describe("getShelves", () => {
 		getShelves(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({
-			shelves: fakeShelves,
-			pagination: {
-				total: 1,
-				page: 1,
-				limit: 5,
-				totalPages: 1,
-			},
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.shelves[0]._id).toBe("s1");
+		expect(jsonArg.pagination).toMatchObject({
+			total: 1,
+			page: 1,
+			limit: 5,
+			totalPages: 1,
 		});
 		expect(next).not.toHaveBeenCalled();
 	});
@@ -110,13 +99,7 @@ describe("getShelf", () => {
 	});
 
 	it("returns 404 when shelf is not found", async () => {
-		// findOne().populate().populate() chain returns null
-		const mockPopulate1 = vi.fn().mockReturnThis();
-		const mockPopulate2 = vi.fn().mockResolvedValue(null);
-		(Shelf.findOne as any).mockReturnValue({
-			populate: mockPopulate1,
-		});
-		mockPopulate1.mockReturnValueOnce({ populate: mockPopulate2 });
+		(prisma.shelf.findFirst as any).mockResolvedValue(null);
 
 		const req: any = { householdId: "h1", params: { id: "nonexistent" } };
 		const res = makeMockRes();
@@ -132,10 +115,23 @@ describe("getShelf", () => {
 	});
 
 	it("returns 200 with shelf on success", async () => {
-		const fakeShelf = { _id: "s1", name: "Pantry", items: [] };
-		const mockPopulate2 = vi.fn().mockResolvedValue(fakeShelf);
-		const mockPopulate1 = vi.fn().mockReturnValue({ populate: mockPopulate2 });
-		(Shelf.findOne as any).mockReturnValue({ populate: mockPopulate1 });
+		const fakeShelf = {
+			id: "s1",
+			name: "Pantry",
+			householdId: "h1",
+			items: [
+				{
+					id: "si1",
+					shelfId: "s1",
+					itemId: "i1",
+					itemName: "Rice",
+					quantity: 2,
+					unit: "kg",
+					item: { id: "i1", name: "Rice" },
+				},
+			],
+		};
+		(prisma.shelf.findFirst as any).mockResolvedValue(fakeShelf);
 
 		const req: any = { householdId: "h1", params: { id: "s1" } };
 		const res = makeMockRes();
@@ -144,7 +140,10 @@ describe("getShelf", () => {
 		getShelf(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({ shelf: fakeShelf });
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.shelf._id).toBe("s1");
+		expect(jsonArg.shelf.items[0]._id).toBe("si1");
+		expect(jsonArg.shelf.items[0].item._id).toBe("i1");
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -179,12 +178,8 @@ describe("createShelf", () => {
 	});
 
 	it("returns 201 with message and shelf on success", async () => {
-		const savedShelf = { _id: "s1", name: "Kitchen", householdId: "h1" };
-		// The constructor mock's save() should resolve with savedShelf
-		(Shelf as any).mockImplementation(function (this: any, data: any) {
-			Object.assign(this, data);
-			this.save = vi.fn().mockResolvedValue(savedShelf);
-		});
+		const savedShelf = { id: "s1", name: "Kitchen", householdId: "h1" };
+		(prisma.shelf.create as any).mockResolvedValue(savedShelf);
 
 		const req: any = {
 			householdId: "h1",
@@ -196,10 +191,9 @@ describe("createShelf", () => {
 		createShelf(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Shelf created!",
-			shelf: savedShelf,
-		});
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.message).toBe("Shelf created!");
+		expect(jsonArg.shelf._id).toBe("s1");
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -237,7 +231,7 @@ describe("updateShelf", () => {
 	});
 
 	it("returns 404 when shelf is not found", async () => {
-		(Shelf.findOne as any).mockResolvedValue(null);
+		(prisma.shelf.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "h1",
@@ -256,13 +250,11 @@ describe("updateShelf", () => {
 	});
 
 	it("returns 200 with updated shelf on success", async () => {
-		const updatedShelf = { _id: "s1", name: "Updated", householdId: "h1" };
-		const mockShelfDoc: any = {
-			_id: "s1",
-			name: "Old",
-			save: vi.fn().mockResolvedValue(updatedShelf),
-		};
-		(Shelf.findOne as any).mockResolvedValue(mockShelfDoc);
+		const existingShelf = { id: "s1", name: "Old", householdId: "h1" };
+		const updatedShelf = { id: "s1", name: "Updated", householdId: "h1" };
+
+		(prisma.shelf.findFirst as any).mockResolvedValue(existingShelf);
+		(prisma.shelf.update as any).mockResolvedValue(updatedShelf);
 
 		const req: any = {
 			householdId: "h1",
@@ -274,12 +266,9 @@ describe("updateShelf", () => {
 		updateShelf(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith(
-			expect.objectContaining({
-				message: "Shelf updated successfully",
-				shelf: updatedShelf,
-			}),
-		);
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.message).toBe("Shelf updated successfully");
+		expect(jsonArg.shelf._id).toBe("s1");
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -314,7 +303,7 @@ describe("deleteShelf", () => {
 	});
 
 	it("returns 404 when shelf is not found", async () => {
-		(Shelf.findOneAndDelete as any).mockResolvedValue(null);
+		(prisma.shelf.findFirst as any).mockResolvedValue(null);
 
 		const req: any = { householdId: "h1", body: { shelfId: "nonexistent" } };
 		const res = makeMockRes();
@@ -330,7 +319,9 @@ describe("deleteShelf", () => {
 	});
 
 	it("returns 200 on successful deletion", async () => {
-		(Shelf.findOneAndDelete as any).mockResolvedValue({ _id: "s1" });
+		const existingShelf = { id: "s1", name: "Pantry", householdId: "h1" };
+		(prisma.shelf.findFirst as any).mockResolvedValue(existingShelf);
+		(prisma.shelf.delete as any).mockResolvedValue(existingShelf);
 
 		const req: any = { householdId: "h1", body: { shelfId: "s1" } };
 		const res = makeMockRes();
@@ -412,7 +403,7 @@ describe("addShelfItem", () => {
 	});
 
 	it("returns 404 when shelf is not found", async () => {
-		(Shelf.findOne as any).mockResolvedValue(null);
+		(prisma.shelf.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "h1",
@@ -431,18 +422,20 @@ describe("addShelfItem", () => {
 	});
 
 	it("returns 200 with message and updated shelf on success", async () => {
+		const existingShelf = { id: "s1", name: "Pantry", householdId: "h1" };
 		const updatedShelf = {
-			_id: "s1",
+			id: "s1",
 			name: "Pantry",
-			items: [{ item: "i1", quantity: 3 }],
+			householdId: "h1",
+			items: [
+				{ id: "si1", shelfId: "s1", itemId: "i1", itemName: null, quantity: 3, unit: null, item: { id: "i1", name: "Oats" } },
+			],
 		};
-		const mockItems: any[] = [];
-		const mockShelfDoc: any = {
-			_id: "s1",
-			items: mockItems,
-			save: vi.fn().mockResolvedValue(updatedShelf),
-		};
-		(Shelf.findOne as any).mockResolvedValue(mockShelfDoc);
+
+		(prisma.shelf.findFirst as any)
+			.mockResolvedValueOnce(existingShelf)
+			.mockResolvedValueOnce(updatedShelf);
+		(prisma.shelfItem.create as any).mockResolvedValue({});
 
 		const req: any = {
 			householdId: "h1",
@@ -454,10 +447,10 @@ describe("addShelfItem", () => {
 		addShelfItem(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Item added to shelf",
-			shelf: updatedShelf,
-		});
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.message).toBe("Item added to shelf");
+		expect(jsonArg.shelf._id).toBe("s1");
+		expect(jsonArg.shelf.items[0]._id).toBe("si1");
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -513,7 +506,7 @@ describe("removeShelfItem", () => {
 	});
 
 	it("returns 404 when shelf is not found", async () => {
-		(Shelf.findOne as any).mockResolvedValue(null);
+		(prisma.shelf.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "h1",
@@ -532,18 +525,9 @@ describe("removeShelfItem", () => {
 	});
 
 	it("returns 404 when shelf item is not found within shelf", async () => {
-		const mockShelfDoc: any = {
-			_id: "s1",
-			items: [
-				{
-					_id: { toString: () => "si-other" },
-					item: "i1",
-					quantity: 1,
-				},
-			],
-			save: vi.fn(),
-		};
-		(Shelf.findOne as any).mockResolvedValue(mockShelfDoc);
+		const existingShelf = { id: "s1", name: "Pantry", householdId: "h1" };
+		(prisma.shelf.findFirst as any).mockResolvedValue(existingShelf);
+		(prisma.shelfItem.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "h1",
@@ -562,25 +546,24 @@ describe("removeShelfItem", () => {
 	});
 
 	it("returns 200 on successful removal", async () => {
-		const shelfItemId = "si1";
-		const updatedShelf = { _id: "s1", items: [] };
-		const mockItems = [
-			{
-				_id: { toString: () => shelfItemId },
-				item: "i1",
-				quantity: 1,
-			},
-		];
-		const mockShelfDoc: any = {
-			_id: "s1",
-			items: mockItems,
-			save: vi.fn().mockResolvedValue(updatedShelf),
+		const existingShelf = { id: "s1", name: "Pantry", householdId: "h1" };
+		const existingShelfItem = { id: "si1", shelfId: "s1", itemId: "i1", quantity: 1, unit: null };
+		const updatedShelf = {
+			id: "s1",
+			name: "Pantry",
+			householdId: "h1",
+			items: [],
 		};
-		(Shelf.findOne as any).mockResolvedValue(mockShelfDoc);
+
+		(prisma.shelf.findFirst as any)
+			.mockResolvedValueOnce(existingShelf)
+			.mockResolvedValueOnce(updatedShelf);
+		(prisma.shelfItem.findFirst as any).mockResolvedValue(existingShelfItem);
+		(prisma.shelfItem.delete as any).mockResolvedValue(existingShelfItem);
 
 		const req: any = {
 			householdId: "h1",
-			body: { shelfId: "s1", shelfItemId },
+			body: { shelfId: "s1", shelfItemId: "si1" },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();

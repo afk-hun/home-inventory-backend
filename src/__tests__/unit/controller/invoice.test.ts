@@ -1,30 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Module-level save mock — tests can replace the resolved value as needed
-let mockSave = vi.fn();
+vi.mock("../../../lib/prisma", () => ({
+	prisma: {
+		invoice: {
+			findMany: vi.fn(),
+			findUnique: vi.fn(),
+			create: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+		},
+		invoiceElement: {
+			deleteMany: vi.fn(),
+		},
+		$transaction: vi.fn(),
+	},
+}));
 
-vi.mock("../../../models/invoice", () => {
-	const find = vi.fn();
-	const findById = vi.fn();
-	const findByIdAndDelete = vi.fn();
-
-	// Must be a regular function (not arrow) so `new Invoice(...)` works.
-	// Vitest requires vi.fn() for mockImplementationOnce; wrapping the
-	// regular function inside vi.fn() satisfies both constraints.
-	const MockInvoice = vi.fn(function MockInvoiceImpl(this: any, data: any) {
-		Object.assign(this, data);
-		// `mockSave` is captured by reference — tests can set mockSave.mockResolvedValue(...)
-		this.save = (...args: any[]) => mockSave(...args);
-	});
-
-	(MockInvoice as any).find = find;
-	(MockInvoice as any).findById = findById;
-	(MockInvoice as any).findByIdAndDelete = findByIdAndDelete;
-
-	return { default: MockInvoice };
-});
-
-import Invoice from "../../../models/invoice";
+import { prisma } from "../../../lib/prisma";
 import {
 	getInvoices,
 	createInvoice,
@@ -46,7 +38,6 @@ const makeMockRes = () => {
 describe("getInvoices", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.householdId is missing", () => {
@@ -64,9 +55,9 @@ describe("getInvoices", () => {
 
 	it("returns 200 with all invoices when no storeId provided", async () => {
 		const mockDocs = [
-			{ _id: "invoice-1", storeName: "Costco", storeAddress: "123 Main St", invoiceItems: [] },
+			{ id: "invoice-1", storeName: "Costco", storeAddress: "123 Main St", purchaseDate: new Date(), householdId: "household-1", storeId: "store-1", invoiceItems: [] },
 		];
-		(Invoice.find as any).mockResolvedValue(mockDocs);
+		(prisma.invoice.findMany as any).mockResolvedValue(mockDocs);
 
 		const req: any = { householdId: "household-1", query: {} };
 		const res = makeMockRes();
@@ -75,15 +66,17 @@ describe("getInvoices", () => {
 		getInvoices(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({ invoices: mockDocs });
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.invoices[0]._id).toBe("invoice-1");
+		expect(jsonArg.invoices[0].invoiceItems).toEqual([]);
 		expect(next).not.toHaveBeenCalled();
 	});
 
 	it("returns 200 with filtered invoices when storeId provided", async () => {
 		const mockDocs = [
-			{ _id: "invoice-2", storeName: "Target", storeAddress: "456 Oak Ave", invoiceItems: [] },
+			{ id: "invoice-2", storeName: "Target", storeAddress: "456 Oak Ave", purchaseDate: new Date(), householdId: "household-1", storeId: "store-1", invoiceItems: [] },
 		];
-		(Invoice.find as any).mockResolvedValue(mockDocs);
+		(prisma.invoice.findMany as any).mockResolvedValue(mockDocs);
 
 		const req: any = { householdId: "household-1", query: { storeId: "store-1" } };
 		const res = makeMockRes();
@@ -92,7 +85,8 @@ describe("getInvoices", () => {
 		getInvoices(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({ invoices: mockDocs });
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.invoices[0]._id).toBe("invoice-2");
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -104,7 +98,6 @@ describe("getInvoices", () => {
 describe("createInvoice", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.user is missing", () => {
@@ -131,7 +124,7 @@ describe("createInvoice", () => {
 
 	it("calls next with 404 when req.householdId is missing", () => {
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: undefined,
 			body: {
 				storeId: "store-1",
@@ -153,9 +146,9 @@ describe("createInvoice", () => {
 
 	it("calls next with 400 when required fields are missing", () => {
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "household-1",
-			body: { storeName: "Walmart" }, // missing storeId, storeAddress and purchaseDate
+			body: { storeName: "Walmart" },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -170,7 +163,7 @@ describe("createInvoice", () => {
 
 	it("calls next with 400 when storeId is missing", () => {
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "household-1",
 			body: { storeName: "Walmart", storeAddress: "456 Oak Ave", purchaseDate: "2024-06-01" },
 		};
@@ -186,7 +179,7 @@ describe("createInvoice", () => {
 
 	it("returns 201 with invoice on success", async () => {
 		const savedDoc = {
-			_id: "new-invoice-id",
+			id: "new-invoice-id",
 			householdId: "household-1",
 			storeId: "store-1",
 			storeName: "Target",
@@ -195,11 +188,10 @@ describe("createInvoice", () => {
 			invoiceItems: [],
 		};
 
-		// Point the shared save mock at our resolved value
-		mockSave = vi.fn().mockResolvedValue(savedDoc);
+		(prisma.invoice.create as any).mockResolvedValue(savedDoc);
 
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "household-1",
 			body: {
 				storeId: "store-1",
@@ -214,10 +206,10 @@ describe("createInvoice", () => {
 		createInvoice(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Invoice created!",
-			invoice: savedDoc,
-		});
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.message).toBe("Invoice created!");
+		expect(jsonArg.invoice._id).toBe("new-invoice-id");
+		expect(jsonArg.invoice.invoiceItems).toEqual([]);
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -229,7 +221,6 @@ describe("createInvoice", () => {
 describe("updateInvoice", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 400 when invoiceId is missing", () => {
@@ -245,8 +236,8 @@ describe("updateInvoice", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when Invoice.findById returns null", async () => {
-		(Invoice.findById as any).mockResolvedValue(null);
+	it("calls next with 404 when invoice is not found", async () => {
+		(prisma.invoice.findUnique as any).mockResolvedValue(null);
 
 		const req: any = {
 			body: { invoiceId: "nonexistent-id", storeName: "New Name" },
@@ -265,23 +256,26 @@ describe("updateInvoice", () => {
 	});
 
 	it("returns 200 with updated invoice on success", async () => {
-		const updatedDoc = {
-			_id: "invoice-1",
-			storeName: "Updated Store",
-			storeAddress: "123 Main St",
-			purchaseDate: new Date("2024-01-01"),
-			invoiceItems: [],
-		};
-
-		const mockFoundDoc: any = {
-			_id: "invoice-1",
+		const existingDoc = {
+			id: "invoice-1",
 			storeName: "Old Store",
 			storeAddress: "123 Main St",
 			purchaseDate: new Date("2024-01-01"),
-			invoiceItems: [],
-			save: vi.fn().mockResolvedValue(updatedDoc),
+			householdId: "household-1",
+			storeId: "store-1",
 		};
-		(Invoice.findById as any).mockResolvedValue(mockFoundDoc);
+		const updatedDoc = {
+			id: "invoice-1",
+			storeName: "Updated Store",
+			storeAddress: "123 Main St",
+			purchaseDate: new Date("2024-01-01"),
+			householdId: "household-1",
+			storeId: "store-1",
+			invoiceItems: [],
+		};
+
+		(prisma.invoice.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.invoice.update as any).mockResolvedValue(updatedDoc);
 
 		const req: any = {
 			body: { invoiceId: "invoice-1", storeName: "Updated Store" },
@@ -292,10 +286,9 @@ describe("updateInvoice", () => {
 		updateInvoice(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Invoice updated successfully",
-			invoice: updatedDoc,
-		});
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.message).toBe("Invoice updated successfully");
+		expect(jsonArg.invoice._id).toBe("invoice-1");
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -307,7 +300,6 @@ describe("updateInvoice", () => {
 describe("deleteInvoice", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 400 when invoiceId is missing", () => {
@@ -323,8 +315,8 @@ describe("deleteInvoice", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when Invoice.findByIdAndDelete returns null", async () => {
-		(Invoice.findByIdAndDelete as any).mockResolvedValue(null);
+	it("calls next with 404 when invoice is not found", async () => {
+		(prisma.invoice.findUnique as any).mockResolvedValue(null);
 
 		const req: any = { body: { invoiceId: "nonexistent-id" } };
 		const res = makeMockRes();
@@ -341,14 +333,16 @@ describe("deleteInvoice", () => {
 	});
 
 	it("returns 200 on successful deletion", async () => {
-		const deletedDoc = {
-			_id: "invoice-1",
+		const existingDoc = {
+			id: "invoice-1",
 			storeName: "Costco",
 			storeAddress: "123 Main St",
 			purchaseDate: new Date("2024-01-01"),
-			invoiceItems: [],
+			householdId: "household-1",
+			storeId: "store-1",
 		};
-		(Invoice.findByIdAndDelete as any).mockResolvedValue(deletedDoc);
+		(prisma.invoice.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.invoice.delete as any).mockResolvedValue(existingDoc);
 
 		const req: any = { body: { invoiceId: "invoice-1" } };
 		const res = makeMockRes();

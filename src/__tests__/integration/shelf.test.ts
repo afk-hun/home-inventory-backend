@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
-import mongoose from "mongoose";
+import { prisma } from "../../lib/prisma";
 import app from "../../app";
-import User from "../../models/user";
-import Household from "../../models/household";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -23,16 +21,9 @@ async function getCsrf() {
  */
 async function loginAsNewUser(email: string, password = "password123") {
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "Shelf Test User",
-		email,
-		password: hashed,
-	}).save();
-	const household = await new Household({
-		name: "Shelf Test Household",
-		owner: user,
-		members: [user],
-	}).save();
+	const user = await prisma.user.create({ data: { name: "Shelf Test User", email, password: hashed } });
+	const household = await prisma.household.create({ data: { name: "Shelf Test Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: household.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")
@@ -73,9 +64,8 @@ describe("GET /shelf/shelf", () => {
 describe("GET /shelf/shelf/:id", () => {
 	it("returns 401 when not authenticated", async () => {
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
 		const res = await agent
-			.get(`/shelf/shelf/${fakeId}`)
+			.get(`/shelf/shelf/nonexistent-id`)
 			.set("x-csrf-token", csrf);
 		expect(res.status).toBe(401);
 	});
@@ -83,9 +73,8 @@ describe("GET /shelf/shelf/:id", () => {
 	it("returns 404 for a non-existent shelf id", async () => {
 		await loginAsNewUser("shelf-get-404@test.com");
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
 		const res = await agent
-			.get(`/shelf/shelf/${fakeId}`)
+			.get(`/shelf/shelf/nonexistent-id`)
 			.set("x-csrf-token", csrf);
 		expect(res.status).toBe(404);
 	});
@@ -170,7 +159,7 @@ describe("PATCH /shelf/shelf", () => {
 		const res = await agent
 			.patch("/shelf/shelf")
 			.set("x-csrf-token", csrf)
-			.send({ shelfId: new mongoose.Types.ObjectId().toHexString(), name: "X" });
+			.send({ shelfId: "nonexistent-id", name: "X" });
 		expect(res.status).toBe(401);
 	});
 
@@ -187,7 +176,7 @@ describe("PATCH /shelf/shelf", () => {
 	it("returns 404 for a non-existent shelfId", async () => {
 		await loginAsNewUser("shelf-patch-404@test.com");
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const res = await agent
 			.patch("/shelf/shelf")
 			.set("x-csrf-token", csrf)
@@ -229,7 +218,7 @@ describe("DELETE /shelf/shelf", () => {
 		const res = await agent
 			.delete("/shelf/shelf")
 			.set("x-csrf-token", csrf)
-			.send({ shelfId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ shelfId: "nonexistent-id" });
 		expect(res.status).toBe(401);
 	});
 
@@ -246,7 +235,7 @@ describe("DELETE /shelf/shelf", () => {
 	it("returns 404 for a non-existent shelfId", async () => {
 		await loginAsNewUser("shelf-delete-404@test.com");
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const res = await agent
 			.delete("/shelf/shelf")
 			.set("x-csrf-token", csrf)
@@ -286,8 +275,8 @@ describe("POST /shelf/shelf/add-item", () => {
 			.post("/shelf/shelf/add-item")
 			.set("x-csrf-token", csrf)
 			.send({
-				shelfId: new mongoose.Types.ObjectId().toHexString(),
-				itemId: new mongoose.Types.ObjectId().toHexString(),
+				shelfId: "nonexistent-id",
+				itemId: "nonexistent-id",
 				quantity: 1,
 			});
 		expect(res.status).toBe(401);
@@ -311,8 +300,8 @@ describe("POST /shelf/shelf/add-item", () => {
 			.post("/shelf/shelf/add-item")
 			.set("x-csrf-token", csrf)
 			.send({
-				shelfId: new mongoose.Types.ObjectId().toHexString(),
-				itemId: new mongoose.Types.ObjectId().toHexString(),
+				shelfId: "nonexistent-id",
+				itemId: "nonexistent-id",
 			});
 		expect(res.status).toBe(400);
 	});
@@ -324,8 +313,8 @@ describe("POST /shelf/shelf/add-item", () => {
 			.post("/shelf/shelf/add-item")
 			.set("x-csrf-token", csrf)
 			.send({
-				shelfId: new mongoose.Types.ObjectId().toHexString(),
-				itemId: new mongoose.Types.ObjectId().toHexString(),
+				shelfId: "nonexistent-id",
+				itemId: "nonexistent-id",
 				quantity: 1,
 			});
 		expect(res.status).toBe(404);
@@ -343,8 +332,14 @@ describe("POST /shelf/shelf/add-item", () => {
 		expect(createRes.status).toBe(201);
 		const shelfId = createRes.body.shelf._id;
 
-		// Use a raw ObjectId as itemId (no Item collection needed — the schema stores the ref without validation)
-		const itemId = new mongoose.Types.ObjectId().toHexString();
+		// Create a real item via the API
+		csrf = await getCsrf();
+		const itemRes = await agent
+			.post("/shelf/item")
+			.set("x-csrf-token", csrf)
+			.send({ name: "Test Item" });
+		expect(itemRes.status).toBe(201);
+		const itemId = itemRes.body.item._id;
 
 		csrf = await getCsrf();
 		const res = await agent
@@ -371,8 +366,8 @@ describe("DELETE /shelf/shelf/remove-item", () => {
 			.delete("/shelf/shelf/remove-item")
 			.set("x-csrf-token", csrf)
 			.send({
-				shelfId: new mongoose.Types.ObjectId().toHexString(),
-				shelfItemId: new mongoose.Types.ObjectId().toHexString(),
+				shelfId: "nonexistent-id",
+				shelfItemId: "nonexistent-id",
 			});
 		expect(res.status).toBe(401);
 	});
@@ -394,8 +389,8 @@ describe("DELETE /shelf/shelf/remove-item", () => {
 			.delete("/shelf/shelf/remove-item")
 			.set("x-csrf-token", csrf)
 			.send({
-				shelfId: new mongoose.Types.ObjectId().toHexString(),
-				shelfItemId: new mongoose.Types.ObjectId().toHexString(),
+				shelfId: "nonexistent-id",
+				shelfItemId: "nonexistent-id",
 			});
 		expect(res.status).toBe(404);
 	});
@@ -412,8 +407,14 @@ describe("DELETE /shelf/shelf/remove-item", () => {
 		expect(createRes.status).toBe(201);
 		const shelfId = createRes.body.shelf._id;
 
-		// Add an item
-		const itemId = new mongoose.Types.ObjectId().toHexString();
+		// Add an item (create a real item first)
+		csrf = await getCsrf();
+		const itemRes = await agent
+			.post("/shelf/item")
+			.set("x-csrf-token", csrf)
+			.send({ name: "Removal Test Item" });
+		expect(itemRes.status).toBe(201);
+		const itemId = itemRes.body.item._id;
 		csrf = await getCsrf();
 		const addRes = await agent
 			.post("/shelf/shelf/add-item")

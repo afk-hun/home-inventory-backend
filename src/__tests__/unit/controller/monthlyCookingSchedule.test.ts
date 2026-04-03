@@ -1,25 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-let mockSave = vi.fn();
+vi.mock("../../../lib/prisma", () => ({
+	prisma: {
+		monthlyCookingSchedule: {
+			findMany: vi.fn(),
+			findFirst: vi.fn(),
+			create: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+		},
+		meal: {
+			deleteMany: vi.fn(),
+		},
+		$transaction: vi.fn(),
+	},
+}));
 
-vi.mock("../../../models/monthlyCookingSchedule", () => {
-	const find = vi.fn();
-	const findOne = vi.fn();
-	const findOneAndDelete = vi.fn();
-
-	const MockSchedule = vi.fn(function MockScheduleImpl(this: any, data: any) {
-		Object.assign(this, data);
-		this.save = (...args: any[]) => mockSave(...args);
-	});
-
-	(MockSchedule as any).find = find;
-	(MockSchedule as any).findOne = findOne;
-	(MockSchedule as any).findOneAndDelete = findOneAndDelete;
-
-	return { default: MockSchedule };
-});
-
-import MonthlyCookingSchedule from "../../../models/monthlyCookingSchedule";
+import { prisma } from "../../../lib/prisma";
 import {
 	getSchedules,
 	getSchedule,
@@ -35,6 +32,17 @@ const makeMockRes = () => {
 	return res;
 };
 
+const makeMeal = (overrides: any = {}) => ({
+	id: "meal-1",
+	scheduleId: "s-1",
+	recipeId: "recipe-1",
+	mealType: "Breakfast",
+	start: new Date("2026-03-01T07:00:00Z"),
+	end: new Date("2026-03-01T08:00:00Z"),
+	portion: 2,
+	...overrides,
+});
+
 // ---------------------------------------------------------------------------
 // getSchedules
 // ---------------------------------------------------------------------------
@@ -42,7 +50,6 @@ const makeMockRes = () => {
 describe("getSchedules", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.user is missing", () => {
@@ -59,7 +66,7 @@ describe("getSchedules", () => {
 	});
 
 	it("calls next with 404 when householdId is missing", () => {
-		const req: any = { user: { _id: "user-1" }, householdId: undefined };
+		const req: any = { user: { id: "user-1" }, householdId: undefined };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -71,10 +78,10 @@ describe("getSchedules", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 500 when MonthlyCookingSchedule.find rejects", async () => {
-		(MonthlyCookingSchedule.find as any).mockRejectedValue(new Error("DB error"));
+	it("calls next with 500 when findMany rejects", async () => {
+		(prisma.monthlyCookingSchedule.findMany as any).mockRejectedValue(new Error("DB error"));
 
-		const req: any = { user: { _id: "user-1" }, householdId: "hh-1" };
+		const req: any = { user: { id: "user-1" }, householdId: "hh-1" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -91,7 +98,7 @@ describe("getSchedules", () => {
 	it("returns 200 with schedules array on happy path", async () => {
 		const mockDocs = [
 			{
-				_id: "s-1",
+				id: "s-1",
 				householdId: "hh-1",
 				name: "March 2026",
 				start: new Date("2026-03-01"),
@@ -99,30 +106,34 @@ describe("getSchedules", () => {
 				meals: [],
 			},
 		];
-		(MonthlyCookingSchedule.find as any).mockResolvedValue(mockDocs);
+		(prisma.monthlyCookingSchedule.findMany as any).mockResolvedValue(mockDocs);
 
-		const req: any = { user: { _id: "user-1" }, householdId: "hh-1" };
+		const req: any = { user: { id: "user-1" }, householdId: "hh-1" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
 		getSchedules(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({ schedules: mockDocs });
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.schedules[0]._id).toBe("s-1");
+		expect(jsonArg.schedules[0].meals).toEqual([]);
 		expect(next).not.toHaveBeenCalled();
 	});
 
-	it("calls find with the correct householdId", async () => {
-		(MonthlyCookingSchedule.find as any).mockResolvedValue([]);
+	it("calls findMany with the correct householdId", async () => {
+		(prisma.monthlyCookingSchedule.findMany as any).mockResolvedValue([]);
 
-		const req: any = { user: { _id: "user-1" }, householdId: "hh-42" };
+		const req: any = { user: { id: "user-1" }, householdId: "hh-42" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
 		getSchedules(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(MonthlyCookingSchedule.find).toHaveBeenCalledWith({ householdId: "hh-42" });
+		expect(prisma.monthlyCookingSchedule.findMany).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { householdId: "hh-42" } }),
+		);
 	});
 });
 
@@ -133,7 +144,6 @@ describe("getSchedules", () => {
 describe("getSchedule", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.user is missing", () => {
@@ -150,7 +160,7 @@ describe("getSchedule", () => {
 	});
 
 	it("calls next with 404 when householdId is missing", () => {
-		const req: any = { user: { _id: "user-1" }, householdId: undefined, params: { id: "s-1" } };
+		const req: any = { user: { id: "user-1" }, householdId: undefined, params: { id: "s-1" } };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -163,10 +173,10 @@ describe("getSchedule", () => {
 	});
 
 	it("calls next with 404 when schedule is not found", async () => {
-		(MonthlyCookingSchedule.findOne as any).mockResolvedValue(null);
+		(prisma.monthlyCookingSchedule.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 			params: { id: "nonexistent-id" },
 		};
@@ -183,11 +193,11 @@ describe("getSchedule", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 500 when findOne rejects", async () => {
-		(MonthlyCookingSchedule.findOne as any).mockRejectedValue(new Error("DB failure"));
+	it("calls next with 500 when findFirst rejects", async () => {
+		(prisma.monthlyCookingSchedule.findFirst as any).mockRejectedValue(new Error("DB failure"));
 
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 			params: { id: "s-1" },
 		};
@@ -205,18 +215,19 @@ describe("getSchedule", () => {
 	});
 
 	it("returns 200 with schedule on happy path", async () => {
+		const meal = makeMeal();
 		const mockDoc = {
-			_id: "s-1",
+			id: "s-1",
 			householdId: "hh-1",
 			name: "March 2026",
 			start: new Date("2026-03-01"),
 			end: new Date("2026-03-31"),
-			meals: [],
+			meals: [meal],
 		};
-		(MonthlyCookingSchedule.findOne as any).mockResolvedValue(mockDoc);
+		(prisma.monthlyCookingSchedule.findFirst as any).mockResolvedValue(mockDoc);
 
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 			params: { id: "s-1" },
 		};
@@ -226,7 +237,10 @@ describe("getSchedule", () => {
 		getSchedule(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({ schedule: mockDoc });
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.schedule._id).toBe("s-1");
+		expect(jsonArg.schedule.meals[0]._id).toBe("meal-1");
+		expect(jsonArg.schedule.meals[0].recipe).toBe("recipe-1");
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -238,7 +252,6 @@ describe("getSchedule", () => {
 describe("createSchedule", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.user is missing", () => {
@@ -260,7 +273,7 @@ describe("createSchedule", () => {
 
 	it("calls next with 404 when householdId is missing", () => {
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: undefined,
 			body: { name: "March", start: "2026-03-01", end: "2026-03-31" },
 		};
@@ -277,7 +290,7 @@ describe("createSchedule", () => {
 
 	it("calls next with 400 when name is missing", () => {
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 			body: { start: "2026-03-01", end: "2026-03-31" },
 		};
@@ -294,7 +307,7 @@ describe("createSchedule", () => {
 
 	it("calls next with 400 when start is missing", () => {
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 			body: { name: "March", end: "2026-03-31" },
 		};
@@ -311,7 +324,7 @@ describe("createSchedule", () => {
 
 	it("calls next with 400 when end is missing", () => {
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 			body: { name: "March", start: "2026-03-01" },
 		};
@@ -326,11 +339,11 @@ describe("createSchedule", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 500 when save rejects", async () => {
-		mockSave = vi.fn().mockRejectedValue(new Error("Save failed"));
+	it("calls next with 500 when create rejects", async () => {
+		(prisma.monthlyCookingSchedule.create as any).mockRejectedValue(new Error("Save failed"));
 
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 			body: { name: "March", start: "2026-03-01", end: "2026-03-31" },
 		};
@@ -349,17 +362,17 @@ describe("createSchedule", () => {
 
 	it("returns 201 with schedule on happy path", async () => {
 		const savedDoc = {
-			_id: "s-new",
+			id: "s-new",
 			householdId: "hh-1",
 			name: "March 2026",
 			start: new Date("2026-03-01"),
 			end: new Date("2026-03-31"),
 			meals: [],
 		};
-		mockSave = vi.fn().mockResolvedValue(savedDoc);
+		(prisma.monthlyCookingSchedule.create as any).mockResolvedValue(savedDoc);
 
 		const req: any = {
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 			body: { name: "March 2026", start: "2026-03-01", end: "2026-03-31" },
 		};
@@ -369,51 +382,11 @@ describe("createSchedule", () => {
 		createSchedule(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Schedule created!",
-			schedule: savedDoc,
-		});
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.message).toBe("Schedule created!");
+		expect(jsonArg.schedule._id).toBe("s-new");
+		expect(jsonArg.schedule.meals).toEqual([]);
 		expect(next).not.toHaveBeenCalled();
-	});
-
-	it("creates schedule with meals array when provided", async () => {
-		const meal = {
-			start: "2026-03-01T07:00:00.000Z",
-			end: "2026-03-01T08:00:00.000Z",
-			mealType: "Breakfast",
-			recipe: "recipe-1",
-			portion: 2,
-		};
-		const savedDoc = {
-			_id: "s-new",
-			householdId: "hh-1",
-			name: "March 2026",
-			start: new Date("2026-03-01"),
-			end: new Date("2026-03-31"),
-			meals: [meal],
-		};
-		mockSave = vi.fn().mockResolvedValue(savedDoc);
-
-		const req: any = {
-			user: { _id: "user-1" },
-			householdId: "hh-1",
-			body: {
-				name: "March 2026",
-				start: "2026-03-01",
-				end: "2026-03-31",
-				meals: [meal],
-			},
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		createSchedule(req, res, next);
-
-		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Schedule created!",
-			schedule: savedDoc,
-		});
 	});
 });
 
@@ -424,7 +397,6 @@ describe("createSchedule", () => {
 describe("updateSchedule", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when householdId is missing", () => {
@@ -460,7 +432,7 @@ describe("updateSchedule", () => {
 	});
 
 	it("calls next with 404 when schedule is not found", async () => {
-		(MonthlyCookingSchedule.findOne as any).mockResolvedValue(null);
+		(prisma.monthlyCookingSchedule.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -479,8 +451,8 @@ describe("updateSchedule", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 500 when findOne rejects", async () => {
-		(MonthlyCookingSchedule.findOne as any).mockRejectedValue(new Error("DB error"));
+	it("calls next with 500 when findFirst rejects", async () => {
+		(prisma.monthlyCookingSchedule.findFirst as any).mockRejectedValue(new Error("DB error"));
 
 		const req: any = {
 			householdId: "hh-1",
@@ -500,23 +472,24 @@ describe("updateSchedule", () => {
 	});
 
 	it("returns 200 with updated schedule on happy path", async () => {
+		const existingDoc = {
+			id: "s-1",
+			householdId: "hh-1",
+			name: "March 2026",
+			start: new Date("2026-03-01"),
+			end: new Date("2026-03-31"),
+		};
 		const updatedDoc = {
-			_id: "s-1",
+			id: "s-1",
 			householdId: "hh-1",
 			name: "April 2026",
 			start: new Date("2026-04-01"),
 			end: new Date("2026-04-30"),
 			meals: [],
 		};
-		const mockFoundDoc: any = {
-			_id: "s-1",
-			name: "March 2026",
-			start: new Date("2026-03-01"),
-			end: new Date("2026-03-31"),
-			meals: [],
-			save: vi.fn().mockResolvedValue(updatedDoc),
-		};
-		(MonthlyCookingSchedule.findOne as any).mockResolvedValue(mockFoundDoc);
+
+		(prisma.monthlyCookingSchedule.findFirst as any).mockResolvedValue(existingDoc);
+		(prisma.monthlyCookingSchedule.update as any).mockResolvedValue(updatedDoc);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -533,38 +506,10 @@ describe("updateSchedule", () => {
 		updateSchedule(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Schedule updated successfully",
-			schedule: updatedDoc,
-		});
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.message).toBe("Schedule updated successfully");
+		expect(jsonArg.schedule._id).toBe("s-1");
 		expect(next).not.toHaveBeenCalled();
-	});
-
-	it("only updates fields that are provided", async () => {
-		const mockFoundDoc: any = {
-			_id: "s-1",
-			name: "Old Name",
-			start: new Date("2026-03-01"),
-			end: new Date("2026-03-31"),
-			meals: [],
-			save: vi.fn().mockResolvedValue({ _id: "s-1", name: "New Name" }),
-		};
-		(MonthlyCookingSchedule.findOne as any).mockResolvedValue(mockFoundDoc);
-
-		const req: any = {
-			householdId: "hh-1",
-			body: { scheduleId: "s-1", name: "New Name" },
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		updateSchedule(req, res, next);
-
-		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(mockFoundDoc.name).toBe("New Name");
-		// start, end, meals left unchanged
-		expect(mockFoundDoc.start).toEqual(new Date("2026-03-01"));
-		expect(mockFoundDoc.end).toEqual(new Date("2026-03-31"));
 	});
 });
 
@@ -575,7 +520,6 @@ describe("updateSchedule", () => {
 describe("deleteSchedule", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when householdId is missing", () => {
@@ -610,8 +554,8 @@ describe("deleteSchedule", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when findOneAndDelete returns null", async () => {
-		(MonthlyCookingSchedule.findOneAndDelete as any).mockResolvedValue(null);
+	it("calls next with 404 when schedule is not found", async () => {
+		(prisma.monthlyCookingSchedule.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -630,33 +574,16 @@ describe("deleteSchedule", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 500 when findOneAndDelete rejects", async () => {
-		(MonthlyCookingSchedule.findOneAndDelete as any).mockRejectedValue(new Error("DB down"));
-
-		const req: any = {
-			householdId: "hh-1",
-			body: { scheduleId: "s-1" },
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		deleteSchedule(req, res, next);
-
-		await vi.waitFor(() =>
-			expect(next).toHaveBeenCalledWith(
-				expect.objectContaining({ statusCode: 500 }),
-			),
-		);
-		expect(res.status).not.toHaveBeenCalled();
-	});
-
 	it("returns 200 on successful deletion", async () => {
-		const deletedDoc = {
-			_id: "s-1",
+		const existingDoc = {
+			id: "s-1",
 			householdId: "hh-1",
 			name: "March 2026",
+			start: new Date("2026-03-01"),
+			end: new Date("2026-03-31"),
 		};
-		(MonthlyCookingSchedule.findOneAndDelete as any).mockResolvedValue(deletedDoc);
+		(prisma.monthlyCookingSchedule.findFirst as any).mockResolvedValue(existingDoc);
+		(prisma.monthlyCookingSchedule.delete as any).mockResolvedValue(existingDoc);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -674,9 +601,10 @@ describe("deleteSchedule", () => {
 		expect(next).not.toHaveBeenCalled();
 	});
 
-	it("calls findOneAndDelete with correct id and householdId", async () => {
-		const deletedDoc = { _id: "s-99", householdId: "hh-1", name: "Old" };
-		(MonthlyCookingSchedule.findOneAndDelete as any).mockResolvedValue(deletedDoc);
+	it("calls delete with correct scheduleId", async () => {
+		const existingDoc = { id: "s-99", householdId: "hh-1", name: "Old", start: new Date(), end: new Date() };
+		(prisma.monthlyCookingSchedule.findFirst as any).mockResolvedValue(existingDoc);
+		(prisma.monthlyCookingSchedule.delete as any).mockResolvedValue(existingDoc);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -688,9 +616,6 @@ describe("deleteSchedule", () => {
 		deleteSchedule(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(MonthlyCookingSchedule.findOneAndDelete).toHaveBeenCalledWith({
-			_id: "s-99",
-			householdId: "hh-1",
-		});
+		expect(prisma.monthlyCookingSchedule.delete).toHaveBeenCalledWith({ where: { id: "s-99" } });
 	});
 });

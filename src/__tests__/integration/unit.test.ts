@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
+import { prisma } from "../../lib/prisma";
 import app from "../../app";
-import User from "../../models/user";
-import Household from "../../models/household";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -19,16 +18,9 @@ async function getCsrf() {
 async function loginAsNewUser(email = "unit-user@test.com") {
 	const password = "password123";
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "Unit User",
-		email,
-		password: hashed,
-	}).save();
-	await new Household({
-		name: "Unit Household",
-		owner: user,
-		members: [user],
-	}).save();
+	const user = await prisma.user.create({ data: { name: "Unit User", email, password: hashed } });
+	const _hh = await prisma.household.create({ data: { name: "Unit Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: _hh.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")

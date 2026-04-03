@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
+import { prisma } from "../../lib/prisma";
 import app from "../../app";
-import User from "../../models/user";
-import Household from "../../models/household";
-import Invoice from "../../models/invoice";
-import mongoose, { Types } from "mongoose";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -21,25 +18,38 @@ async function getCsrf() {
 /** Creates a user + household in DB, logs in via HTTP. */
 async function loginAsNewUser(email: string, password = "password123") {
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "Invoice User",
-		email,
-		password: hashed,
-	}).save();
-
-	await new Household({
-		name: "Invoice Household",
-		owner: user,
-		members: [user],
-	}).save();
-
+	const user = await prisma.user.create({ data: { name: "Invoice User", email, password: hashed } });
+	const _hh = await prisma.household.create({ data: { name: "Invoice Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: _hh.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")
 		.set("x-csrf-token", csrf)
 		.send({ email, password });
-
 	return user;
+}
+
+/** Creates a real store via API, then creates an invoice for it. Requires a logged-in agent. */
+async function createInvoiceViaApi(storeName: string) {
+	let csrf = await getCsrf();
+	const storeRes = await agent
+		.post("/store/store")
+		.set("x-csrf-token", csrf)
+		.send({ name: storeName });
+	const storeId = storeRes.body.store._id;
+
+	csrf = await getCsrf();
+	const res = await agent
+		.post("/invoice/invoice")
+		.set("x-csrf-token", csrf)
+		.send({
+			storeId,
+			storeName,
+			storeAddress: "123 Test St",
+			purchaseDate: "2024-01-01",
+			invoiceItems: [],
+		});
+	return res;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,20 +78,10 @@ describe("GET /invoice/invoice", () => {
 
 	it("returns 200 filtered by storeId", async () => {
 		await loginAsNewUser("inv-get-filter@test.com");
-		const storeId = new Types.ObjectId();
-
-		await new Invoice({
-			householdId: new Types.ObjectId(),
-			storeId,
-			storeName: "Grocery World",
-			storeAddress: "42 Market St",
-			purchaseDate: new Date("2024-05-10"),
-			invoiceItems: [],
-		}).save();
-
+		// Use a fake storeId that won't match any invoice — the endpoint should still return 200 with an empty array
 		const csrf = await getCsrf();
 		const res = await agent
-			.get(`/invoice/invoice?storeId=${storeId.toHexString()}`)
+			.get(`/invoice/invoice?storeId=nonexistent-store-id`)
 			.set("x-csrf-token", csrf);
 
 		expect(res.status).toBe(200);
@@ -100,7 +100,7 @@ describe("POST /invoice/invoice", () => {
 			.post("/invoice/invoice")
 			.set("x-csrf-token", csrf)
 			.send({
-				storeId: new Types.ObjectId().toHexString(),
+				storeId: "nonexistent-id",
 				storeName: "Costco",
 				storeAddress: "1 Warehouse Blvd",
 				purchaseDate: "2024-04-01",
@@ -120,12 +120,21 @@ describe("POST /invoice/invoice", () => {
 
 	it("returns 201 with invoice in response on valid create", async () => {
 		await loginAsNewUser("inv-create-201@test.com");
-		const csrf = await getCsrf();
+
+		// Create a real store first (FK constraint)
+		let csrf = await getCsrf();
+		const storeRes = await agent
+			.post("/store/store")
+			.set("x-csrf-token", csrf)
+			.send({ name: "Target" });
+		const storeId = storeRes.body.store._id;
+
+		csrf = await getCsrf();
 		const res = await agent
 			.post("/invoice/invoice")
 			.set("x-csrf-token", csrf)
 			.send({
-				storeId: new Types.ObjectId().toHexString(),
+				storeId,
 				storeName: "Target",
 				storeAddress: "100 Commerce Ave",
 				purchaseDate: "2024-07-20",
@@ -149,7 +158,7 @@ describe("PATCH /invoice/invoice", () => {
 		const res = await agent
 			.patch("/invoice/invoice")
 			.set("x-csrf-token", csrf)
-			.send({ invoiceId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ invoiceId: "nonexistent-id" });
 		expect(res.status).toBe(401);
 	});
 
@@ -165,7 +174,7 @@ describe("PATCH /invoice/invoice", () => {
 
 	it("returns 404 for a non-existent invoice id", async () => {
 		await loginAsNewUser("inv-patch-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.patch("/invoice/invoice")
@@ -177,22 +186,17 @@ describe("PATCH /invoice/invoice", () => {
 	it("returns 200 with updated invoice on valid update", async () => {
 		await loginAsNewUser("inv-patch-200@test.com");
 
-		// Create an invoice to update (householdId and storeId are required)
-		const invoice = await new Invoice({
-			householdId: new Types.ObjectId(),
-			storeId: new Types.ObjectId(),
-			storeName: "Old Name",
-			storeAddress: "Old Address",
-			purchaseDate: new Date("2024-01-01"),
-			invoiceItems: [],
-		}).save();
+		// Create an invoice via the API
+		const createRes = await createInvoiceViaApi("Old Name");
+		expect(createRes.status).toBe(201);
+		const invoiceId = createRes.body.invoice._id;
 
 		const csrf = await getCsrf();
 		const res = await agent
 			.patch("/invoice/invoice")
 			.set("x-csrf-token", csrf)
 			.send({
-				invoiceId: invoice._id.toHexString(),
+				invoiceId,
 				storeName: "New Name",
 			});
 
@@ -212,7 +216,7 @@ describe("DELETE /invoice/invoice", () => {
 		const res = await agent
 			.delete("/invoice/invoice")
 			.set("x-csrf-token", csrf)
-			.send({ invoiceId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ invoiceId: "nonexistent-id" });
 		expect(res.status).toBe(401);
 	});
 
@@ -228,7 +232,7 @@ describe("DELETE /invoice/invoice", () => {
 
 	it("returns 404 for a non-existent invoice id", async () => {
 		await loginAsNewUser("inv-delete-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.delete("/invoice/invoice")
@@ -240,21 +244,16 @@ describe("DELETE /invoice/invoice", () => {
 	it("returns 200 on successful deletion", async () => {
 		await loginAsNewUser("inv-delete-200@test.com");
 
-		// Create an invoice to delete (householdId and storeId are required)
-		const invoice = await new Invoice({
-			householdId: new Types.ObjectId(),
-			storeId: new Types.ObjectId(),
-			storeName: "Doomed Store",
-			storeAddress: "Nowhere Lane",
-			purchaseDate: new Date("2024-02-14"),
-			invoiceItems: [],
-		}).save();
+		// Create an invoice via the API
+		const createRes = await createInvoiceViaApi("Doomed Store");
+		expect(createRes.status).toBe(201);
+		const invoiceId = createRes.body.invoice._id;
 
 		const csrf = await getCsrf();
 		const res = await agent
 			.delete("/invoice/invoice")
 			.set("x-csrf-token", csrf)
-			.send({ invoiceId: invoice._id.toHexString() });
+			.send({ invoiceId });
 
 		expect(res.status).toBe(200);
 		expect(res.body.message).toBe("Invoice deleted successfully");

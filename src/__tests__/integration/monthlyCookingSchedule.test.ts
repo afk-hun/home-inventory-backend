@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
-import mongoose from "mongoose";
+import { prisma } from "../../lib/prisma";
 import app from "../../app";
-import User from "../../models/user";
-import Household from "../../models/household";
-import Recipe from "../../models/recipe";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -21,34 +18,20 @@ async function getCsrf() {
 /** Creates a user + household in DB, logs in via HTTP, returns the user and household. */
 async function loginAsNewUser(email: string, password = "password123") {
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "Schedule Test User",
-		email,
-		password: hashed,
-	}).save();
-
-	const household = await new Household({
-		name: "Schedule Test Household",
-		owner: user,
-		members: [user],
-	}).save();
-
+	const user = await prisma.user.create({ data: { name: "Schedule Test User", email, password: hashed } });
+	const household = await prisma.household.create({ data: { name: "Schedule Test Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: household.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")
 		.set("x-csrf-token", csrf)
 		.send({ email, password });
-
 	return { user, household };
 }
 
 /** Creates a recipe in DB scoped to the given household. */
-async function createRecipeInDb(householdId: mongoose.Types.ObjectId) {
-	return new Recipe({
-		householdId,
-		name: "Test Recipe",
-		ingredients: [],
-	}).save();
+async function createRecipeInDb(householdId: string) {
+	return prisma.recipe.create({ data: { name: "Test Recipe", householdId } });
 }
 
 const validMeal = (recipeId: string) => ({
@@ -83,7 +66,7 @@ describe("GET /cooking-schedule", () => {
 
 	it("returns only schedules belonging to the authenticated user's household", async () => {
 		const { household } = await loginAsNewUser("cs-get-scoped@test.com");
-		const recipe = await createRecipeInDb(household._id);
+		const recipe = await createRecipeInDb(household.id);
 
 		const csrf1 = await getCsrf();
 		await agent
@@ -93,7 +76,7 @@ describe("GET /cooking-schedule", () => {
 				name: "March 2026",
 				start: "2026-03-01T00:00:00.000Z",
 				end: "2026-03-31T23:59:59.000Z",
-				meals: [validMeal(recipe._id.toString())],
+				meals: [validMeal(recipe.id)],
 			});
 
 		const csrf2 = await getCsrf();
@@ -124,7 +107,7 @@ describe("GET /cooking-schedule", () => {
 describe("GET /cooking-schedule/:id", () => {
 	it("returns 401 when not authenticated", async () => {
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const res = await agent
 			.get(`/cooking-schedule/${fakeId}`)
 			.set("x-csrf-token", csrf);
@@ -133,7 +116,7 @@ describe("GET /cooking-schedule/:id", () => {
 
 	it("returns 404 for a non-existent schedule id", async () => {
 		await loginAsNewUser("cs-getid-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.get(`/cooking-schedule/${fakeId}`)
@@ -240,7 +223,7 @@ describe("POST /cooking-schedule", () => {
 
 	it("returns 201 with meals when provided", async () => {
 		const { household } = await loginAsNewUser("cs-create-201-meals@test.com");
-		const recipe = await createRecipeInDb(household._id);
+		const recipe = await createRecipeInDb(household.id);
 
 		const csrf = await getCsrf();
 		const res = await agent
@@ -250,7 +233,7 @@ describe("POST /cooking-schedule", () => {
 				name: "March 2026",
 				start: "2026-03-01T00:00:00.000Z",
 				end: "2026-03-31T23:59:59.000Z",
-				meals: [validMeal(recipe._id.toString())],
+				meals: [validMeal(recipe.id)],
 			});
 
 		expect(res.status).toBe(201);
@@ -292,7 +275,7 @@ describe("PATCH /cooking-schedule", () => {
 		const res = await agent
 			.patch("/cooking-schedule")
 			.set("x-csrf-token", csrf)
-			.send({ scheduleId: new mongoose.Types.ObjectId().toHexString(), name: "Ghost" });
+			.send({ scheduleId: "nonexistent-id", name: "Ghost" });
 		expect(res.status).toBe(401);
 	});
 
@@ -309,7 +292,7 @@ describe("PATCH /cooking-schedule", () => {
 
 	it("returns 404 for a non-existent scheduleId", async () => {
 		await loginAsNewUser("cs-patch-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.patch("/cooking-schedule")
@@ -387,7 +370,7 @@ describe("DELETE /cooking-schedule", () => {
 		const res = await agent
 			.delete("/cooking-schedule")
 			.set("x-csrf-token", csrf)
-			.send({ scheduleId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ scheduleId: "nonexistent-id" });
 		expect(res.status).toBe(401);
 	});
 
@@ -404,7 +387,7 @@ describe("DELETE /cooking-schedule", () => {
 
 	it("returns 404 for a non-existent scheduleId", async () => {
 		await loginAsNewUser("cs-delete-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.delete("/cooking-schedule")

@@ -1,15 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../../models/household", () => {
-	const mockHousehold = {
-		find: vi.fn(),
-		findById: vi.fn(),
-		findByIdAndDelete: vi.fn(),
-	};
-	return { default: mockHousehold };
-});
+vi.mock("../../../lib/prisma", () => ({
+	prisma: {
+		household: {
+			findMany: vi.fn(),
+			findUnique: vi.fn(),
+			create: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+		},
+	},
+}));
 
-import Household from "../../../models/household";
+import { prisma } from "../../../lib/prisma";
 import {
 	getHouseholds,
 	createHousehold,
@@ -66,12 +69,12 @@ describe("getHouseholds", () => {
 
 	it("returns mapped household list on success", async () => {
 		const mockDocs = [
-			{ _id: "h1", name: "Home", members: [] },
-			{ _id: "h2", name: "Office", members: [] },
+			{ id: "h1", name: "Home", ownerId: "u1" },
+			{ id: "h2", name: "Office", ownerId: "u1" },
 		];
-		(Household.find as any).mockResolvedValue(mockDocs);
+		(prisma.household.findMany as any).mockResolvedValue(mockDocs);
 
-		const req: any = { user: { _id: "user-1" } };
+		const req: any = { user: { id: "user-1" } };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -80,9 +83,9 @@ describe("getHouseholds", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
 		expect(res.json).toHaveBeenCalledWith({
 			households: mockDocs.map((h) => ({
-				_id: h._id,
+				_id: h.id,
 				name: h.name,
-				members: h.members,
+				members: [],
 			})),
 		});
 	});
@@ -90,7 +93,7 @@ describe("getHouseholds", () => {
 
 describe("createHousehold", () => {
 	it("returns 400 when name is missing", async () => {
-		const req: any = { body: {}, user: { _id: "u1", name: "Alice" } };
+		const req: any = { body: {}, user: { id: "u1", name: "Alice" } };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -128,7 +131,7 @@ describe("renameHousehold", () => {
 	});
 
 	it("returns 404 when household is not found", async () => {
-		(Household.findById as any).mockResolvedValue(null);
+		(prisma.household.findUnique as any).mockResolvedValue(null);
 
 		const req: any = {
 			body: { householdId: "nonexistent", name: "New Name" },
@@ -160,7 +163,7 @@ describe("deleteHousehold", () => {
 	});
 
 	it("returns 404 when household is not found", async () => {
-		(Household.findByIdAndDelete as any).mockResolvedValue(null);
+		(prisma.household.findUnique as any).mockResolvedValue(null);
 
 		const req: any = { body: { householdId: "nonexistent" } };
 		const res = makeMockRes();

@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
-import mongoose from "mongoose";
+import { prisma } from "../../lib/prisma";
 import app from "../../app";
-import User from "../../models/user";
-import Household from "../../models/household";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -19,16 +17,9 @@ async function getCsrf() {
 
 async function loginAsNewUser(email: string, password = "password123") {
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "ItemType User",
-		email,
-		password: hashed,
-	}).save();
-	await new Household({
-		name: "ItemType Household",
-		owner: user,
-		members: [user],
-	}).save();
+	const user = await prisma.user.create({ data: { name: "ItemType User", email, password: hashed } });
+	const _hh = await prisma.household.create({ data: { name: "ItemType Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: _hh.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")
@@ -110,7 +101,7 @@ describe("PATCH /shelf/item-type", () => {
 			.patch("/shelf/item-type")
 			.set("x-csrf-token", csrf)
 			.send({
-				itemTypeId: new mongoose.Types.ObjectId().toHexString(),
+				itemTypeId: "nonexistent-id",
 				name: "New Name",
 			});
 		expect(res.status).toBe(401);
@@ -129,7 +120,7 @@ describe("PATCH /shelf/item-type", () => {
 	it("returns 404 for a non-existent itemTypeId", async () => {
 		await loginAsNewUser("it-patch-404@test.com");
 		const csrf = await getCsrf();
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const res = await agent
 			.patch("/shelf/item-type")
 			.set("x-csrf-token", csrf)
@@ -169,7 +160,7 @@ describe("DELETE /shelf/item-type", () => {
 		const res = await agent
 			.delete("/shelf/item-type")
 			.set("x-csrf-token", csrf)
-			.send({ itemTypeId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ itemTypeId: "nonexistent-id" });
 		expect(res.status).toBe(401);
 	});
 
@@ -185,7 +176,7 @@ describe("DELETE /shelf/item-type", () => {
 
 	it("returns 404 for a non-existent itemTypeId", async () => {
 		await loginAsNewUser("it-delete-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.delete("/shelf/item-type")

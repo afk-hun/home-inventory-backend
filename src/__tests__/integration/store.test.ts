@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
+import { prisma } from "../../lib/prisma";
 import app from "../../app";
-import User from "../../models/user";
-import Household from "../../models/household";
-import mongoose from "mongoose";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -20,24 +18,14 @@ async function getCsrf() {
 /** Creates a user + household in DB, logs in via HTTP. */
 async function loginAsNewUser(email: string, password = "password123") {
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "Store User",
-		email,
-		password: hashed,
-	}).save();
-
-	await new Household({
-		name: "Store Household",
-		owner: user,
-		members: [user],
-	}).save();
-
+	const user = await prisma.user.create({ data: { name: "Store User", email, password: hashed } });
+	const _hh = await prisma.household.create({ data: { name: "Store Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: _hh.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")
 		.set("x-csrf-token", csrf)
 		.send({ email, password });
-
 	return user;
 }
 
@@ -73,7 +61,7 @@ describe("GET /store/store", () => {
 
 describe("GET /store/store/:id", () => {
 	it("returns 401 when not authenticated", async () => {
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.get(`/store/store/${fakeId}`)
@@ -83,7 +71,7 @@ describe("GET /store/store/:id", () => {
 
 	it("returns 404 for a non-existent store id", async () => {
 		await loginAsNewUser("store-get-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.get(`/store/store/${fakeId}`)
@@ -165,7 +153,7 @@ describe("PATCH /store/store", () => {
 		const res = await agent
 			.patch("/store/store")
 			.set("x-csrf-token", csrf)
-			.send({ storeId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ storeId: "nonexistent-id" });
 		expect(res.status).toBe(401);
 	});
 
@@ -181,7 +169,7 @@ describe("PATCH /store/store", () => {
 
 	it("returns 404 for a non-existent storeId", async () => {
 		await loginAsNewUser("store-patch-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.patch("/store/store")
@@ -224,7 +212,7 @@ describe("DELETE /store/store", () => {
 		const res = await agent
 			.delete("/store/store")
 			.set("x-csrf-token", csrf)
-			.send({ storeId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ storeId: "nonexistent-id" });
 		expect(res.status).toBe(401);
 	});
 
@@ -240,7 +228,7 @@ describe("DELETE /store/store", () => {
 
 	it("returns 404 for a non-existent storeId", async () => {
 		await loginAsNewUser("store-delete-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.delete("/store/store")

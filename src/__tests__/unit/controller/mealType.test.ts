@@ -1,27 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Module-level save mock — tests can replace the resolved value per-test
-let mockSave = vi.fn();
+vi.mock("../../../lib/prisma", () => ({
+	prisma: {
+		mealType: {
+			findMany: vi.fn(),
+			findUnique: vi.fn(),
+			create: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+		},
+	},
+}));
 
-vi.mock("../../../models/mealType", () => {
-	const find = vi.fn();
-	const findById = vi.fn();
-	const findByIdAndDelete = vi.fn();
-
-	// Must be a regular function (not arrow) so `new MealType(...)` works.
-	const MockMealType = vi.fn(function MockMealTypeImpl(this: any, data: any) {
-		Object.assign(this, data);
-		this.save = (...args: any[]) => mockSave(...args);
-	});
-
-	(MockMealType as any).find = find;
-	(MockMealType as any).findById = findById;
-	(MockMealType as any).findByIdAndDelete = findByIdAndDelete;
-
-	return { default: MockMealType };
-});
-
-import MealType from "../../../models/mealType";
+import { prisma } from "../../../lib/prisma";
 import {
 	getMealTypes,
 	createMealType,
@@ -43,7 +34,6 @@ const makeMockRes = () => {
 describe("getMealTypes", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.user is missing", () => {
@@ -60,7 +50,7 @@ describe("getMealTypes", () => {
 	});
 
 	it("calls next with 404 when householdId is missing", () => {
-		const req: any = { user: { _id: "user-1" }, householdId: undefined };
+		const req: any = { user: { id: "user-1" }, householdId: undefined };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -72,10 +62,10 @@ describe("getMealTypes", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 500 when MealType.find rejects", async () => {
-		(MealType.find as any).mockRejectedValue(new Error("DB error"));
+	it("calls next with 500 when findMany rejects", async () => {
+		(prisma.mealType.findMany as any).mockRejectedValue(new Error("DB error"));
 
-		const req: any = { user: { _id: "user-1" }, householdId: "hh-1" };
+		const req: any = { user: { id: "user-1" }, householdId: "hh-1" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -91,12 +81,12 @@ describe("getMealTypes", () => {
 
 	it("returns 200 with mealTypes array on happy path", async () => {
 		const mockDocs = [
-			{ _id: "mt-1", name: "Breakfast", householdId: "hh-1" },
-			{ _id: "mt-2", name: "Dinner", householdId: "hh-1" },
+			{ id: "mt-1", name: "Breakfast", householdId: "hh-1" },
+			{ id: "mt-2", name: "Dinner", householdId: "hh-1" },
 		];
-		(MealType.find as any).mockResolvedValue(mockDocs);
+		(prisma.mealType.findMany as any).mockResolvedValue(mockDocs);
 
-		const req: any = { user: { _id: "user-1" }, householdId: "hh-1" };
+		const req: any = { user: { id: "user-1" }, householdId: "hh-1" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
@@ -105,7 +95,7 @@ describe("getMealTypes", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
 		expect(res.json).toHaveBeenCalledWith({
 			mealTypes: mockDocs.map((d) => ({
-				_id: d._id,
+				_id: d.id,
 				name: d.name,
 				householdId: d.householdId,
 			})),
@@ -113,17 +103,17 @@ describe("getMealTypes", () => {
 		expect(next).not.toHaveBeenCalled();
 	});
 
-	it("MealType.find is called with the correct householdId", async () => {
-		(MealType.find as any).mockResolvedValue([]);
+	it("findMany is called with the correct householdId", async () => {
+		(prisma.mealType.findMany as any).mockResolvedValue([]);
 
-		const req: any = { user: { _id: "user-1" }, householdId: "hh-42" };
+		const req: any = { user: { id: "user-1" }, householdId: "hh-42" };
 		const res = makeMockRes();
 		const next = vi.fn();
 
 		getMealTypes(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(MealType.find).toHaveBeenCalledWith({ householdId: "hh-42" });
+		expect(prisma.mealType.findMany).toHaveBeenCalledWith({ where: { householdId: "hh-42" } });
 	});
 });
 
@@ -134,13 +124,12 @@ describe("getMealTypes", () => {
 describe("createMealType", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 400 when name is missing", () => {
 		const req: any = {
 			body: {},
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 		};
 		const res = makeMockRes();
@@ -174,7 +163,7 @@ describe("createMealType", () => {
 	it("calls next with 400 when householdId is missing", () => {
 		const req: any = {
 			body: { name: "Lunch" },
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: undefined,
 		};
 		const res = makeMockRes();
@@ -188,12 +177,12 @@ describe("createMealType", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 500 when save rejects", async () => {
-		mockSave = vi.fn().mockRejectedValue(new Error("Save failed"));
+	it("calls next with 500 when create rejects", async () => {
+		(prisma.mealType.create as any).mockRejectedValue(new Error("Save failed"));
 
 		const req: any = {
 			body: { name: "Lunch" },
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 		};
 		const res = makeMockRes();
@@ -210,12 +199,12 @@ describe("createMealType", () => {
 	});
 
 	it("returns 201 with mealType on happy path", async () => {
-		const savedDoc = { _id: "mt-new", name: "Lunch", householdId: "hh-1" };
-		mockSave = vi.fn().mockResolvedValue(savedDoc);
+		const savedDoc = { id: "mt-new", name: "Lunch", householdId: "hh-1" };
+		(prisma.mealType.create as any).mockResolvedValue(savedDoc);
 
 		const req: any = {
 			body: { name: "Lunch" },
-			user: { _id: "user-1" },
+			user: { id: "user-1" },
 			householdId: "hh-1",
 		};
 		const res = makeMockRes();
@@ -226,7 +215,7 @@ describe("createMealType", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
 		expect(res.json).toHaveBeenCalledWith({
 			message: "Meal type created!",
-			mealType: savedDoc,
+			mealType: { _id: "mt-new", name: "Lunch", householdId: "hh-1" },
 		});
 		expect(next).not.toHaveBeenCalled();
 	});
@@ -239,7 +228,6 @@ describe("createMealType", () => {
 describe("renameMealType", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 400 when householdId is missing", () => {
@@ -290,8 +278,8 @@ describe("renameMealType", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when findById returns null", async () => {
-		(MealType.findById as any).mockResolvedValue(null);
+	it("calls next with 404 when mealType is not found", async () => {
+		(prisma.mealType.findUnique as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -310,8 +298,8 @@ describe("renameMealType", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 500 when findById rejects", async () => {
-		(MealType.findById as any).mockRejectedValue(new Error("DB error"));
+	it("calls next with 500 when findUnique rejects", async () => {
+		(prisma.mealType.findUnique as any).mockRejectedValue(new Error("DB error"));
 
 		const req: any = {
 			householdId: "hh-1",
@@ -331,13 +319,11 @@ describe("renameMealType", () => {
 	});
 
 	it("returns 200 with mealTypeId on happy path", async () => {
-		const updatedDoc = { _id: "mt-1", name: "Renamed" };
-		const mockFoundDoc: any = {
-			_id: "mt-1",
-			name: "Old Name",
-			save: vi.fn().mockResolvedValue(updatedDoc),
-		};
-		(MealType.findById as any).mockResolvedValue(mockFoundDoc);
+		const existingDoc = { id: "mt-1", name: "Old Name", householdId: "hh-1" };
+		const updatedDoc = { id: "mt-1", name: "Renamed", householdId: "hh-1" };
+
+		(prisma.mealType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.mealType.update as any).mockResolvedValue(updatedDoc);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -351,18 +337,17 @@ describe("renameMealType", () => {
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
 		expect(res.json).toHaveBeenCalledWith({
 			message: "Meal type renamed successfully",
-			mealTypeId: updatedDoc._id,
+			mealTypeId: "mt-1",
 		});
 		expect(next).not.toHaveBeenCalled();
 	});
 
-	it("updates the name on the found document before saving", async () => {
-		const mockFoundDoc: any = {
-			_id: "mt-1",
-			name: "Old Name",
-			save: vi.fn().mockResolvedValue({ _id: "mt-1", name: "Renamed" }),
-		};
-		(MealType.findById as any).mockResolvedValue(mockFoundDoc);
+	it("calls update with the correct name", async () => {
+		const existingDoc = { id: "mt-1", name: "Old Name", householdId: "hh-1" };
+		const updatedDoc = { id: "mt-1", name: "Renamed", householdId: "hh-1" };
+
+		(prisma.mealType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.mealType.update as any).mockResolvedValue(updatedDoc);
 
 		const req: any = {
 			householdId: "hh-1",
@@ -374,7 +359,9 @@ describe("renameMealType", () => {
 		renameMealType(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(mockFoundDoc.name).toBe("Renamed");
+		expect(prisma.mealType.update).toHaveBeenCalledWith(
+			expect.objectContaining({ data: { name: "Renamed" } }),
+		);
 	});
 });
 
@@ -385,7 +372,6 @@ describe("renameMealType", () => {
 describe("deleteMealType", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 400 when mealTypeId is missing", () => {
@@ -401,8 +387,8 @@ describe("deleteMealType", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when findByIdAndDelete returns null", async () => {
-		(MealType.findByIdAndDelete as any).mockResolvedValue(null);
+	it("calls next with 404 when mealType is not found", async () => {
+		(prisma.mealType.findUnique as any).mockResolvedValue(null);
 
 		const req: any = { body: { mealTypeId: "nonexistent-id" } };
 		const res = makeMockRes();
@@ -418,8 +404,10 @@ describe("deleteMealType", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 500 when findByIdAndDelete rejects", async () => {
-		(MealType.findByIdAndDelete as any).mockRejectedValue(new Error("DB down"));
+	it("calls next with 500 when delete rejects", async () => {
+		const existingDoc = { id: "mt-1", name: "Breakfast", householdId: "hh-1" };
+		(prisma.mealType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.mealType.delete as any).mockRejectedValue(new Error("DB down"));
 
 		const req: any = { body: { mealTypeId: "mt-1" } };
 		const res = makeMockRes();
@@ -436,8 +424,9 @@ describe("deleteMealType", () => {
 	});
 
 	it("returns 200 on successful deletion", async () => {
-		const deletedDoc = { _id: "mt-1", name: "Breakfast", householdId: "hh-1" };
-		(MealType.findByIdAndDelete as any).mockResolvedValue(deletedDoc);
+		const existingDoc = { id: "mt-1", name: "Breakfast", householdId: "hh-1" };
+		(prisma.mealType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.mealType.delete as any).mockResolvedValue(existingDoc);
 
 		const req: any = { body: { mealTypeId: "mt-1" } };
 		const res = makeMockRes();
@@ -452,9 +441,10 @@ describe("deleteMealType", () => {
 		expect(next).not.toHaveBeenCalled();
 	});
 
-	it("calls findByIdAndDelete with the correct id", async () => {
-		const deletedDoc = { _id: "mt-99", name: "Snack", householdId: "hh-1" };
-		(MealType.findByIdAndDelete as any).mockResolvedValue(deletedDoc);
+	it("calls delete with the correct id", async () => {
+		const existingDoc = { id: "mt-99", name: "Snack", householdId: "hh-1" };
+		(prisma.mealType.findUnique as any).mockResolvedValue(existingDoc);
+		(prisma.mealType.delete as any).mockResolvedValue(existingDoc);
 
 		const req: any = { body: { mealTypeId: "mt-99" } };
 		const res = makeMockRes();
@@ -463,6 +453,6 @@ describe("deleteMealType", () => {
 		deleteMealType(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(MealType.findByIdAndDelete).toHaveBeenCalledWith("mt-99");
+		expect(prisma.mealType.delete).toHaveBeenCalledWith({ where: { id: "mt-99" } });
 	});
 });

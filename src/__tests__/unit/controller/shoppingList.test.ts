@@ -1,28 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-let mockSave = vi.fn();
+vi.mock("../../../lib/prisma", () => ({
+	prisma: {
+		shoppingList: {
+			findMany: vi.fn(),
+			findFirst: vi.fn(),
+			create: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+		},
+		shoppingListItem: {
+			deleteMany: vi.fn(),
+		},
+		$transaction: vi.fn(),
+	},
+}));
 
-vi.mock("../../../models/shoppingList", () => {
-	const find = vi.fn();
-	const findOne = vi.fn();
-	const findOneAndDelete = vi.fn();
-
-	const MockShoppingList = vi.fn(function MockShoppingListImpl(
-		this: any,
-		data: any,
-	) {
-		Object.assign(this, data);
-		this.save = (...args: any[]) => mockSave(...args);
-	});
-
-	(MockShoppingList as any).find = find;
-	(MockShoppingList as any).findOne = findOne;
-	(MockShoppingList as any).findOneAndDelete = findOneAndDelete;
-
-	return { default: MockShoppingList };
-});
-
-import ShoppingList from "../../../models/shoppingList";
+import { prisma } from "../../../lib/prisma";
 import {
 	getShoppingLists,
 	getShoppingList,
@@ -38,6 +32,16 @@ const makeMockRes = () => {
 	return res;
 };
 
+const makeItem = (overrides: any = {}) => ({
+	id: "item-1",
+	itemName: "Milk",
+	quantity: 2,
+	unit: "liter",
+	checked: false,
+	shoppingListId: "list-1",
+	...overrides,
+});
+
 // ---------------------------------------------------------------------------
 // getShoppingLists
 // ---------------------------------------------------------------------------
@@ -45,7 +49,6 @@ const makeMockRes = () => {
 describe("getShoppingLists", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.householdId is missing", () => {
@@ -62,15 +65,17 @@ describe("getShoppingLists", () => {
 	});
 
 	it("returns 200 with shoppingLists array on success", async () => {
+		const item = makeItem();
 		const mockDocs = [
 			{
-				_id: "list-1",
+				id: "list-1",
 				name: "Weekly Shop",
 				storeId: "store-1",
-				items: [{ itemName: "Milk", quantity: 2, unit: "liter", checked: false }],
+				householdId: "household-1",
+				items: [item],
 			},
 		];
-		(ShoppingList.find as any).mockResolvedValue(mockDocs);
+		(prisma.shoppingList.findMany as any).mockResolvedValue(mockDocs);
 
 		const req: any = { householdId: "household-1" };
 		const res = makeMockRes();
@@ -79,7 +84,9 @@ describe("getShoppingLists", () => {
 		getShoppingLists(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({ shoppingLists: mockDocs });
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.shoppingLists[0]._id).toBe("list-1");
+		expect(jsonArg.shoppingLists[0].items[0]._id).toBe("item-1");
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -91,7 +98,6 @@ describe("getShoppingLists", () => {
 describe("getShoppingList", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.householdId is missing", () => {
@@ -120,8 +126,8 @@ describe("getShoppingList", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when ShoppingList.findOne returns null", async () => {
-		(ShoppingList.findOne as any).mockResolvedValue(null);
+	it("calls next with 404 when list is not found", async () => {
+		(prisma.shoppingList.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "household-1",
@@ -141,13 +147,15 @@ describe("getShoppingList", () => {
 	});
 
 	it("returns 200 with shoppingList on success", async () => {
+		const item = makeItem({ id: "item-2", itemName: "Eggs", quantity: 6, unit: "pcs", checked: true });
 		const mockDoc = {
-			_id: "list-1",
+			id: "list-1",
 			name: "Weekend Groceries",
 			storeId: "store-1",
-			items: [{ itemName: "Eggs", quantity: 6, unit: "pcs", checked: true }],
+			householdId: "household-1",
+			items: [item],
 		};
-		(ShoppingList.findOne as any).mockResolvedValue(mockDoc);
+		(prisma.shoppingList.findFirst as any).mockResolvedValue(mockDoc);
 
 		const req: any = {
 			householdId: "household-1",
@@ -159,7 +167,10 @@ describe("getShoppingList", () => {
 		getShoppingList(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({ shoppingList: mockDoc });
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.shoppingList._id).toBe("list-1");
+		expect(jsonArg.shoppingList.items[0]._id).toBe("item-2");
+		expect(jsonArg.shoppingList.items[0].checked).toBe(true);
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -171,7 +182,6 @@ describe("getShoppingList", () => {
 describe("createShoppingList", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.householdId is missing", () => {
@@ -224,13 +234,13 @@ describe("createShoppingList", () => {
 
 	it("returns 201 with shoppingList on success", async () => {
 		const savedDoc = {
-			_id: "new-list-id",
+			id: "new-list-id",
 			householdId: "household-1",
 			name: "My List",
 			storeId: "store-1",
 			items: [],
 		};
-		mockSave = vi.fn().mockResolvedValue(savedDoc);
+		(prisma.shoppingList.create as any).mockResolvedValue(savedDoc);
 
 		const req: any = {
 			householdId: "household-1",
@@ -242,27 +252,27 @@ describe("createShoppingList", () => {
 		createShoppingList(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Shopping list created!",
-			shoppingList: savedDoc,
-		});
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.message).toBe("Shopping list created!");
+		expect(jsonArg.shoppingList._id).toBe("new-list-id");
+		expect(jsonArg.shoppingList.items).toEqual([]);
 		expect(next).not.toHaveBeenCalled();
 	});
 
 	it("returns 201 with items including checked field when provided", async () => {
-		const items = [{ itemName: "Milk", quantity: 2, unit: "liter", checked: false }];
+		const items = [{ id: "si-1", itemName: "Milk", quantity: 2, unit: "liter", checked: false, shoppingListId: "new-list-id" }];
 		const savedDoc = {
-			_id: "new-list-id",
+			id: "new-list-id",
 			householdId: "household-1",
 			name: "My List",
 			storeId: "store-1",
 			items,
 		};
-		mockSave = vi.fn().mockResolvedValue(savedDoc);
+		(prisma.shoppingList.create as any).mockResolvedValue(savedDoc);
 
 		const req: any = {
 			householdId: "household-1",
-			body: { name: "My List", storeId: "store-1", items },
+			body: { name: "My List", storeId: "store-1", items: [{ itemName: "Milk", quantity: 2, unit: "liter", checked: false }] },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -270,39 +280,7 @@ describe("createShoppingList", () => {
 		createShoppingList(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Shopping list created!",
-			shoppingList: savedDoc,
-		});
 		expect(res.json.mock.calls[0][0].shoppingList.items[0].checked).toBe(false);
-		expect(next).not.toHaveBeenCalled();
-	});
-
-	it("returns 201 with items when provided", async () => {
-		const items = [{ itemName: "Milk", quantity: 2, unit: "liter", checked: false }];
-		const savedDoc = {
-			_id: "new-list-id",
-			householdId: "household-1",
-			name: "My List",
-			storeId: "store-1",
-			items,
-		};
-		mockSave = vi.fn().mockResolvedValue(savedDoc);
-
-		const req: any = {
-			householdId: "household-1",
-			body: { name: "My List", storeId: "store-1", items },
-		};
-		const res = makeMockRes();
-		const next = vi.fn();
-
-		createShoppingList(req, res, next);
-
-		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Shopping list created!",
-			shoppingList: savedDoc,
-		});
 		expect(next).not.toHaveBeenCalled();
 	});
 });
@@ -314,7 +292,6 @@ describe("createShoppingList", () => {
 describe("updateShoppingList", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.householdId is missing", () => {
@@ -349,8 +326,8 @@ describe("updateShoppingList", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when ShoppingList.findOne returns null", async () => {
-		(ShoppingList.findOne as any).mockResolvedValue(null);
+	it("calls next with 404 when list is not found", async () => {
+		(prisma.shoppingList.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "household-1",
@@ -370,20 +347,22 @@ describe("updateShoppingList", () => {
 	});
 
 	it("returns 200 with updated shoppingList on success", async () => {
-		const updatedDoc = {
-			_id: "list-1",
-			name: "Updated List",
-			storeId: "store-1",
-			items: [],
-		};
-		const mockFoundDoc: any = {
-			_id: "list-1",
+		const existingDoc = {
+			id: "list-1",
 			name: "Old Name",
 			storeId: "store-1",
-			items: [],
-			save: vi.fn().mockResolvedValue(updatedDoc),
+			householdId: "household-1",
 		};
-		(ShoppingList.findOne as any).mockResolvedValue(mockFoundDoc);
+		const updatedDoc = {
+			id: "list-1",
+			name: "Updated List",
+			storeId: "store-1",
+			householdId: "household-1",
+			items: [],
+		};
+
+		(prisma.shoppingList.findFirst as any).mockResolvedValue(existingDoc);
+		(prisma.shoppingList.update as any).mockResolvedValue(updatedDoc);
 
 		const req: any = {
 			householdId: "household-1",
@@ -395,36 +374,37 @@ describe("updateShoppingList", () => {
 		updateShoppingList(req, res, next);
 
 		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
-		expect(res.json).toHaveBeenCalledWith({
-			message: "Shopping list updated successfully",
-			shoppingList: updatedDoc,
-		});
+		const jsonArg = res.json.mock.calls[0][0];
+		expect(jsonArg.message).toBe("Shopping list updated successfully");
+		expect(jsonArg.shoppingList._id).toBe("list-1");
 		expect(next).not.toHaveBeenCalled();
 	});
 
-	it("returns 200 and preserves checked field when updating items", async () => {
+	it("returns 200 and preserves checked field when updating items via $transaction", async () => {
 		const newItems = [
-			{ itemName: "Bread", quantity: 1, unit: "pcs", checked: true },
-			{ itemName: "Butter", quantity: 200, unit: "g", checked: false },
+			{ id: "si-1", itemName: "Bread", quantity: 1, unit: "pcs", checked: true, shoppingListId: "list-1" },
+			{ id: "si-2", itemName: "Butter", quantity: 200, unit: "g", checked: false, shoppingListId: "list-1" },
 		];
-		const updatedDoc = {
-			_id: "list-1",
+		const existingDoc = {
+			id: "list-1",
 			name: "Test List",
 			storeId: "store-1",
+			householdId: "household-1",
+		};
+		const updatedDoc = {
+			id: "list-1",
+			name: "Test List",
+			storeId: "store-1",
+			householdId: "household-1",
 			items: newItems,
 		};
-		const mockFoundDoc: any = {
-			_id: "list-1",
-			name: "Test List",
-			storeId: "store-1",
-			items: [{ itemName: "Old Item", quantity: 1, unit: "pcs", checked: false }],
-			save: vi.fn().mockResolvedValue(updatedDoc),
-		};
-		(ShoppingList.findOne as any).mockResolvedValue(mockFoundDoc);
+
+		(prisma.shoppingList.findFirst as any).mockResolvedValue(existingDoc);
+		(prisma.$transaction as any).mockResolvedValue([{}, updatedDoc]);
 
 		const req: any = {
 			householdId: "household-1",
-			body: { shoppingListId: "list-1", items: newItems },
+			body: { shoppingListId: "list-1", items: [{ itemName: "Bread", quantity: 1, unit: "pcs", checked: true }, { itemName: "Butter", quantity: 200, unit: "g", checked: false }] },
 		};
 		const res = makeMockRes();
 		const next = vi.fn();
@@ -445,7 +425,6 @@ describe("updateShoppingList", () => {
 describe("deleteShoppingList", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockSave = vi.fn();
 	});
 
 	it("calls next with 404 when req.householdId is missing", () => {
@@ -480,8 +459,8 @@ describe("deleteShoppingList", () => {
 		expect(res.status).not.toHaveBeenCalled();
 	});
 
-	it("calls next with 404 when ShoppingList.findOneAndDelete returns null", async () => {
-		(ShoppingList.findOneAndDelete as any).mockResolvedValue(null);
+	it("calls next with 404 when list is not found", async () => {
+		(prisma.shoppingList.findFirst as any).mockResolvedValue(null);
 
 		const req: any = {
 			householdId: "household-1",
@@ -501,8 +480,9 @@ describe("deleteShoppingList", () => {
 	});
 
 	it("returns 200 on successful deletion", async () => {
-		const deletedDoc = { _id: "list-1", name: "Doomed List", storeId: "store-1", items: [] };
-		(ShoppingList.findOneAndDelete as any).mockResolvedValue(deletedDoc);
+		const existingDoc = { id: "list-1", name: "Doomed List", storeId: "store-1", householdId: "household-1" };
+		(prisma.shoppingList.findFirst as any).mockResolvedValue(existingDoc);
+		(prisma.shoppingList.delete as any).mockResolvedValue(existingDoc);
 
 		const req: any = {
 			householdId: "household-1",

@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
-import mongoose from "mongoose";
+import { prisma } from "../../lib/prisma";
 import app from "../../app";
-import User from "../../models/user";
-import Household from "../../models/household";
 
 let agent: ReturnType<typeof request.agent>;
 
@@ -20,24 +18,14 @@ async function getCsrf() {
 /** Creates a user + household in DB, logs in via HTTP, returns the user. */
 async function loginAsNewUser(email: string, password = "password123") {
 	const hashed = await bcrypt.hash(password, 1);
-	const user = await new User({
-		name: "Recipe Type User",
-		email,
-		password: hashed,
-	}).save();
-
-	await new Household({
-		name: "Recipe Type Household",
-		owner: user,
-		members: [user],
-	}).save();
-
+	const user = await prisma.user.create({ data: { name: "Recipe Type User", email, password: hashed } });
+	const _hh = await prisma.household.create({ data: { name: "Recipe Type Household", ownerId: user.id } });
+	await prisma.householdMember.create({ data: { householdId: _hh.id, userId: user.id } });
 	const csrf = await getCsrf();
 	await agent
 		.post("/auth/login")
 		.set("x-csrf-token", csrf)
 		.send({ email, password });
-
 	return user;
 }
 
@@ -168,7 +156,7 @@ describe("PATCH /recipe/recipe-type", () => {
 		const res = await agent
 			.patch("/recipe/recipe-type")
 			.set("x-csrf-token", csrf)
-			.send({ recipeTypeId: new mongoose.Types.ObjectId().toHexString(), name: "Ghost" });
+			.send({ recipeTypeId: "nonexistent-id", name: "Ghost" });
 		expect(res.status).toBe(401);
 	});
 
@@ -189,14 +177,14 @@ describe("PATCH /recipe/recipe-type", () => {
 		const res = await agent
 			.patch("/recipe/recipe-type")
 			.set("x-csrf-token", csrf)
-			.send({ recipeTypeId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ recipeTypeId: "nonexistent-id" });
 
 		expect(res.status).toBe(400);
 	});
 
 	it("returns 404 for a non-existent recipeTypeId", async () => {
 		await loginAsNewUser("rt-patch-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.patch("/recipe/recipe-type")
@@ -268,7 +256,7 @@ describe("DELETE /recipe/recipe-type", () => {
 		const res = await agent
 			.delete("/recipe/recipe-type")
 			.set("x-csrf-token", csrf)
-			.send({ recipeTypeId: new mongoose.Types.ObjectId().toHexString() });
+			.send({ recipeTypeId: "nonexistent-id" });
 		expect(res.status).toBe(401);
 	});
 
@@ -285,7 +273,7 @@ describe("DELETE /recipe/recipe-type", () => {
 
 	it("returns 404 for a non-existent recipeTypeId", async () => {
 		await loginAsNewUser("rt-delete-404@test.com");
-		const fakeId = new mongoose.Types.ObjectId().toHexString();
+		const fakeId = "nonexistent-id";
 		const csrf = await getCsrf();
 		const res = await agent
 			.delete("/recipe/recipe-type")
