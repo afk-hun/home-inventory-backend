@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
 import { prisma } from "../lib/prisma";
-import { toMongoDoc } from "../lib/serialize";
+
 import { setHouseholdCookie } from "./auth";
 
 export const setHousehold = (
@@ -82,7 +82,11 @@ export const createHousehold = async (
 		.then((result) => {
 			res.status(201).json({
 				message: "Household created!",
-				household: toMongoDoc(result),
+				household: {
+					_id: result.id,
+					name: result.name,
+					members: [],
+				},
 			});
 		})
 		.catch((err: any) => {
