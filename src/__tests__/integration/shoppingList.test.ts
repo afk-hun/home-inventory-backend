@@ -46,7 +46,7 @@ async function createListInDb(householdId: Types.ObjectId) {
 		householdId,
 		name: "Test List",
 		storeId: new Types.ObjectId(),
-		items: [{ itemName: "Milk", quantity: 2, unit: "liter" }],
+		items: [{ itemName: "Milk", quantity: 2, unit: "liter", checked: false }],
 	}).save();
 }
 
@@ -91,6 +91,19 @@ describe("GET /shopping-list/shopping-list", () => {
 		expect(res.status).toBe(200);
 		expect(res.body.shoppingLists).toHaveLength(1);
 		expect(res.body.shoppingLists[0].name).toBe("Test List");
+	});
+
+	it("returns items with checked field in the list response", async () => {
+		const { household } = await loginAsNewUser("sl-get-checked@test.com");
+		await createListInDb(household._id as Types.ObjectId);
+
+		const csrf = await getCsrf();
+		const res = await agent
+			.get("/shopping-list/shopping-list")
+			.set("x-csrf-token", csrf);
+
+		expect(res.status).toBe(200);
+		expect(res.body.shoppingLists[0].items[0].checked).toBe(false);
 	});
 });
 
@@ -142,6 +155,19 @@ describe("GET /shopping-list/shopping-list/:shoppingListId", () => {
 		expect(res.body.shoppingList).toBeDefined();
 		expect(res.body.shoppingList._id).toBe(list._id.toHexString());
 		expect(res.body.shoppingList.name).toBe("Test List");
+	});
+
+	it("returns items with checked field in single list response", async () => {
+		const { household } = await loginAsNewUser("sl-get-one-checked@test.com");
+		const list = await createListInDb(household._id as Types.ObjectId);
+
+		const csrf = await getCsrf();
+		const res = await agent
+			.get(`/shopping-list/shopping-list/${list._id.toHexString()}`)
+			.set("x-csrf-token", csrf);
+
+		expect(res.status).toBe(200);
+		expect(res.body.shoppingList.items[0].checked).toBe(false);
 	});
 });
 
@@ -211,6 +237,38 @@ describe("POST /shopping-list/shopping-list", () => {
 
 		expect(res.status).toBe(201);
 		expect(res.body.shoppingList.items).toHaveLength(0);
+	});
+
+	it("returns 201 and items have checked defaulting to false when not supplied", async () => {
+		await loginAsNewUser("sl-create-checked-default@test.com");
+		const csrf = await getCsrf();
+		const res = await agent
+			.post("/shopping-list/shopping-list")
+			.set("x-csrf-token", csrf)
+			.send({
+				name: "Checked Default Test",
+				storeId: new Types.ObjectId().toHexString(),
+				items: [{ itemName: "Apples", quantity: 4, unit: "pcs" }],
+			});
+
+		expect(res.status).toBe(201);
+		expect(res.body.shoppingList.items[0].checked).toBe(false);
+	});
+
+	it("returns 201 and persists checked: true when explicitly set", async () => {
+		await loginAsNewUser("sl-create-checked-true@test.com");
+		const csrf = await getCsrf();
+		const res = await agent
+			.post("/shopping-list/shopping-list")
+			.set("x-csrf-token", csrf)
+			.send({
+				name: "Pre-checked List",
+				storeId: new Types.ObjectId().toHexString(),
+				items: [{ itemName: "Milk", quantity: 1, unit: "liter", checked: true }],
+			});
+
+		expect(res.status).toBe(201);
+		expect(res.body.shoppingList.items[0].checked).toBe(true);
 	});
 });
 
@@ -295,6 +353,40 @@ describe("PATCH /shopping-list/shopping-list", () => {
 		expect(res.status).toBe(200);
 		expect(res.body.shoppingList.items).toHaveLength(2);
 		expect(res.body.shoppingList.items[0].itemName).toBe("Bread");
+	});
+
+	it("returns 200 and updates checked field on existing item", async () => {
+		const { household } = await loginAsNewUser("sl-patch-checked@test.com");
+		const list = await createListInDb(household._id as Types.ObjectId);
+
+		const csrf = await getCsrf();
+		const res = await agent
+			.patch("/shopping-list/shopping-list")
+			.set("x-csrf-token", csrf)
+			.send({
+				shoppingListId: list._id.toHexString(),
+				items: [{ itemName: "Milk", quantity: 2, unit: "liter", checked: true }],
+			});
+
+		expect(res.status).toBe(200);
+		expect(res.body.shoppingList.items[0].checked).toBe(true);
+	});
+
+	it("returns 200 and items default checked to false when not supplied in patch", async () => {
+		const { household } = await loginAsNewUser("sl-patch-checked-default@test.com");
+		const list = await createListInDb(household._id as Types.ObjectId);
+
+		const csrf = await getCsrf();
+		const res = await agent
+			.patch("/shopping-list/shopping-list")
+			.set("x-csrf-token", csrf)
+			.send({
+				shoppingListId: list._id.toHexString(),
+				items: [{ itemName: "Juice", quantity: 1, unit: "bottle" }],
+			});
+
+		expect(res.status).toBe(200);
+		expect(res.body.shoppingList.items[0].checked).toBe(false);
 	});
 });
 

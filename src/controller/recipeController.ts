@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
 import Recipe from "../models/recipe";
+import Shelf from "../models/shelf";
 
 export const getRecipes = (
 	req: Request,
@@ -186,6 +187,87 @@ export const updateRecipe = (
 				message: "Recipe updated successfully",
 				recipe: updated,
 			});
+		})
+		.catch((err) => {
+			if (!err.statusCode) err.statusCode = 500;
+			next(err);
+		});
+};
+
+export const getMissingIngredients = (
+	req: Request,
+	res: Response,
+	next: NextFunction,
+) => {
+	const user = req.user;
+	const householdId = req.householdId;
+	const recipeId = req.params.id;
+
+	if (!user) {
+		const error = new Error("User not found") as any;
+		error.statusCode = 404;
+		return next(error);
+	}
+
+	if (!householdId) {
+		const error = new Error("Household not found") as any;
+		error.statusCode = 404;
+		return next(error);
+	}
+
+	let foundRecipe: any;
+
+	Recipe.findById(recipeId)
+		.populate("ingredients.item", "_id name")
+		.then((recipe) => {
+			if (!recipe) {
+				const error = new Error("Recipe not found") as any;
+				error.statusCode = 404;
+				throw error;
+			}
+			foundRecipe = recipe;
+			return Shelf.find({ householdId });
+		})
+		.then((shelves) => {
+			// Build a map: itemId -> { [unit_lower]: totalQuantity }
+			const shelfTotals = new Map<string, Map<string, number>>();
+
+			for (const shelf of shelves) {
+				for (const shelfItem of shelf.items) {
+					const itemId = shelfItem.item.toString();
+					const unit = (shelfItem.unit || "").toLowerCase();
+					if (!shelfTotals.has(itemId)) {
+						shelfTotals.set(itemId, new Map());
+					}
+					const unitMap = shelfTotals.get(itemId)!;
+					unitMap.set(unit, (unitMap.get(unit) || 0) + shelfItem.quantity);
+				}
+			}
+
+			const missing: { item: { _id: any; name: any }; amount: number; unit: string }[] = [];
+
+			for (const ingredient of foundRecipe.ingredients) {
+				const itemId = (ingredient.item._id ?? ingredient.item).toString();
+				const requiredUnit = ingredient.unit.toLowerCase();
+				const requiredAmount = ingredient.quantity;
+
+				const unitMap = shelfTotals.get(itemId);
+				const shelfAmount = unitMap ? (unitMap.get(requiredUnit) || 0) : 0;
+
+				if (shelfAmount < requiredAmount) {
+					const populatedItem = ingredient.item;
+					missing.push({
+						item: {
+							_id: populatedItem._id ?? populatedItem,
+							name: populatedItem.name ?? undefined,
+						},
+						amount: requiredAmount,
+						unit: ingredient.unit,
+					});
+				}
+			}
+
+			res.status(200).json(missing);
 		})
 		.catch((err) => {
 			if (!err.statusCode) err.statusCode = 500;

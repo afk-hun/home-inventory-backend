@@ -63,7 +63,12 @@ describe("getShoppingLists", () => {
 
 	it("returns 200 with shoppingLists array on success", async () => {
 		const mockDocs = [
-			{ _id: "list-1", name: "Weekly Shop", storeId: "store-1", items: [] },
+			{
+				_id: "list-1",
+				name: "Weekly Shop",
+				storeId: "store-1",
+				items: [{ itemName: "Milk", quantity: 2, unit: "liter", checked: false }],
+			},
 		];
 		(ShoppingList.find as any).mockResolvedValue(mockDocs);
 
@@ -136,7 +141,12 @@ describe("getShoppingList", () => {
 	});
 
 	it("returns 200 with shoppingList on success", async () => {
-		const mockDoc = { _id: "list-1", name: "Weekend Groceries", storeId: "store-1", items: [] };
+		const mockDoc = {
+			_id: "list-1",
+			name: "Weekend Groceries",
+			storeId: "store-1",
+			items: [{ itemName: "Eggs", quantity: 6, unit: "pcs", checked: true }],
+		};
 		(ShoppingList.findOne as any).mockResolvedValue(mockDoc);
 
 		const req: any = {
@@ -239,8 +249,37 @@ describe("createShoppingList", () => {
 		expect(next).not.toHaveBeenCalled();
 	});
 
+	it("returns 201 with items including checked field when provided", async () => {
+		const items = [{ itemName: "Milk", quantity: 2, unit: "liter", checked: false }];
+		const savedDoc = {
+			_id: "new-list-id",
+			householdId: "household-1",
+			name: "My List",
+			storeId: "store-1",
+			items,
+		};
+		mockSave = vi.fn().mockResolvedValue(savedDoc);
+
+		const req: any = {
+			householdId: "household-1",
+			body: { name: "My List", storeId: "store-1", items },
+		};
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		createShoppingList(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(201));
+		expect(res.json).toHaveBeenCalledWith({
+			message: "Shopping list created!",
+			shoppingList: savedDoc,
+		});
+		expect(res.json.mock.calls[0][0].shoppingList.items[0].checked).toBe(false);
+		expect(next).not.toHaveBeenCalled();
+	});
+
 	it("returns 201 with items when provided", async () => {
-		const items = [{ itemName: "Milk", quantity: 2, unit: "liter" }];
+		const items = [{ itemName: "Milk", quantity: 2, unit: "liter", checked: false }];
 		const savedDoc = {
 			_id: "new-list-id",
 			householdId: "household-1",
@@ -360,6 +399,41 @@ describe("updateShoppingList", () => {
 			message: "Shopping list updated successfully",
 			shoppingList: updatedDoc,
 		});
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it("returns 200 and preserves checked field when updating items", async () => {
+		const newItems = [
+			{ itemName: "Bread", quantity: 1, unit: "pcs", checked: true },
+			{ itemName: "Butter", quantity: 200, unit: "g", checked: false },
+		];
+		const updatedDoc = {
+			_id: "list-1",
+			name: "Test List",
+			storeId: "store-1",
+			items: newItems,
+		};
+		const mockFoundDoc: any = {
+			_id: "list-1",
+			name: "Test List",
+			storeId: "store-1",
+			items: [{ itemName: "Old Item", quantity: 1, unit: "pcs", checked: false }],
+			save: vi.fn().mockResolvedValue(updatedDoc),
+		};
+		(ShoppingList.findOne as any).mockResolvedValue(mockFoundDoc);
+
+		const req: any = {
+			householdId: "household-1",
+			body: { shoppingListId: "list-1", items: newItems },
+		};
+		const res = makeMockRes();
+		const next = vi.fn();
+
+		updateShoppingList(req, res, next);
+
+		await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(200));
+		expect(res.json.mock.calls[0][0].shoppingList.items[0].checked).toBe(true);
+		expect(res.json.mock.calls[0][0].shoppingList.items[1].checked).toBe(false);
 		expect(next).not.toHaveBeenCalled();
 	});
 });

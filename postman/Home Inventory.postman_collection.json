@@ -1108,7 +1108,7 @@
                 {
                   "key": "storeId",
                   "value": "69a88412a14a788a709ade30",
-                  "description": "optional — filter by store"
+                  "description": "optional \u2014 filter by store"
                 }
               ]
             }
@@ -2215,6 +2215,46 @@
           "response": []
         },
         {
+          "name": "missing ingredients",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_domain}}/recipe/recipes/:id/missing-ingredients",
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "recipe",
+                "recipes",
+                ":id",
+                "missing-ingredients"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "recipe",
           "request": {
             "method": "POST",
@@ -2667,8 +2707,13 @@
             ],
             "url": {
               "raw": "{{api_domain}}/shopping-list/shopping-list",
-              "host": ["{{api_domain}}"],
-              "path": ["shopping-list", "shopping-list"]
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shopping-list",
+                "shopping-list"
+              ]
             }
           },
           "response": []
@@ -2686,8 +2731,14 @@
             ],
             "url": {
               "raw": "{{api_domain}}/shopping-list/shopping-list/:shoppingListId",
-              "host": ["{{api_domain}}"],
-              "path": ["shopping-list", "shopping-list", ":shoppingListId"],
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shopping-list",
+                "shopping-list",
+                ":shoppingListId"
+              ],
               "variable": [
                 {
                   "key": "shoppingListId",
@@ -2716,7 +2767,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Weekly Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Milk\",\n            \"quantity\": 2,\n            \"unit\": \"liter\"\n        },\n        {\n            \"itemName\": \"Bread\",\n            \"quantity\": 1,\n            \"unit\": \"pcs\"\n        }\n    ]\n}",
+              "raw": "{\n    \"name\": \"Weekly Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Milk\",\n            \"quantity\": 2,\n            \"unit\": \"liter\",\n            \"checked\": false\n        },\n        {\n            \"itemName\": \"Bread\",\n            \"quantity\": 1,\n            \"unit\": \"pcs\",\n            \"checked\": false\n        }\n    ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2725,8 +2776,13 @@
             },
             "url": {
               "raw": "{{api_domain}}/shopping-list/shopping-list",
-              "host": ["{{api_domain}}"],
-              "path": ["shopping-list", "shopping-list"]
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shopping-list",
+                "shopping-list"
+              ]
             }
           },
           "response": []
@@ -2749,7 +2805,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"shoppingListId\": \"\",\n    \"name\": \"Updated Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Eggs\",\n            \"quantity\": 12,\n            \"unit\": \"pcs\"\n        }\n    ]\n}",
+              "raw": "{\n    \"shoppingListId\": \"\",\n    \"name\": \"Updated Groceries\",\n    \"storeId\": \"64a88412a14a788a709ade01\",\n    \"items\": [\n        {\n            \"itemName\": \"Eggs\",\n            \"quantity\": 12,\n            \"unit\": \"pcs\",\n            \"checked\": false\n        }\n    ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2758,8 +2814,13 @@
             },
             "url": {
               "raw": "{{api_domain}}/shopping-list/shopping-list",
-              "host": ["{{api_domain}}"],
-              "path": ["shopping-list", "shopping-list"]
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shopping-list",
+                "shopping-list"
+              ]
             }
           },
           "response": []
@@ -2791,8 +2852,13 @@
             },
             "url": {
               "raw": "{{api_domain}}/shopping-list/shopping-list",
-              "host": ["{{api_domain}}"],
-              "path": ["shopping-list", "shopping-list"]
+              "host": [
+                "{{api_domain}}"
+              ],
+              "path": [
+                "shopping-list",
+                "shopping-list"
+              ]
             }
           },
           "response": []

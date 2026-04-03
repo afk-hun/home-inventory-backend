@@ -22,9 +22,18 @@ export const getItems = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	Item.countDocuments({ householdId })
+	const storeId = req.query.storeId as string | undefined;
+	const filter: Record<string, unknown> = { householdId };
+	if (storeId) {
+		filter.$or = [
+			{ connectedStores: { $size: 0 } },
+			{ "connectedStores.storeId": storeId },
+		];
+	}
+
+	Item.countDocuments(filter)
 		.then((total) => {
-			return Item.find({ householdId })
+			return Item.find(filter)
 				.skip(skip)
 				.limit(limit)
 				.then((items) => {
