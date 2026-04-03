@@ -6,7 +6,7 @@ import { toMongoDoc } from "../lib/serialize";
 export const getStore = (req: Request, res: Response, next: NextFunction) => {
 	const user = req.user;
 	const householdId = req.householdId;
-	const { id } = req.params;
+	const id = req.params.id as string;
 
 	if (!user) {
 		const error = new Error("User not found") as any;

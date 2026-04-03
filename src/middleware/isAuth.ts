@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
+import { signAndSetAccessToken } from "../controller/auth";
 
 export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 	const token = req.cookies?.auth_token;
@@ -41,6 +42,7 @@ export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 			}
 			req.user = user;
 			req.householdId = req.cookies?.household_id;
+			signAndSetAccessToken(res, user.email, user.id);
 			next();
 		})
 		.catch(() => {

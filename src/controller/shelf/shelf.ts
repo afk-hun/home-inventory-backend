@@ -45,7 +45,7 @@ export const getShelves = (
 
 export const getShelf = (req: Request, res: Response, next: NextFunction) => {
 	const householdId = req.householdId;
-	const { id } = req.params;
+	const id = req.params.id as string;
 
 	if (!householdId) {
 		const error = new Error("Household not found") as any;

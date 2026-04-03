@@ -57,7 +57,7 @@ export const getRecipe = (
 ) => {
 	const user = req.user;
 	const householdId = req.householdId;
-	const recipeId = req.params.id;
+	const recipeId = req.params.id as string;
 
 	if (!user) {
 		const error = new Error("User not found") as any;
@@ -276,7 +276,7 @@ export const getMissingIngredients = (
 ) => {
 	const user = req.user;
 	const householdId = req.householdId;
-	const recipeId = req.params.id;
+	const recipeId = req.params.id as string;
 
 	if (!user) {
 		const error = new Error("User not found") as any;

@@ -53,7 +53,7 @@ export const getSchedule = (
 ) => {
 	const user = req.user;
 	const householdId = req.householdId;
-	const scheduleId = req.params.id;
+	const scheduleId = req.params.id as string;
 
 	if (!user) {
 		const error = new Error("User not found") as any;

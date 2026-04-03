@@ -9,7 +9,7 @@ const ACCESS_TOKEN_COOKIE_NAME = "auth_token";
 const REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
 const USER_ID_COOKIE_NAME = "user_id";
 const HOUSEHOLD_ID_COOKIE_NAME = "household_id";
-const ACCESS_TOKEN_MAX_AGE_MS = 60 * 60 * 1000;
+const ACCESS_TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 type AuthTokenPayload = {
@@ -26,6 +26,11 @@ const getJwtSecret = (): string => {
 	return process.env.JWT_SECRET;
 };
 
+export const signAndSetAccessToken = (res: Response, email: string, userId: string) => {
+	const token = signAccessToken({ email, userId });
+	setAccessTokenCookie(res, token);
+};
+
 const signAccessToken = (payload: Omit<AuthTokenPayload, "type">): string => {
 	return jwt.sign(
 		{
@@ -33,7 +38,7 @@ const signAccessToken = (payload: Omit<AuthTokenPayload, "type">): string => {
 			type: "access",
 		},
 		getJwtSecret(),
-		{ expiresIn: "1h" },
+		{ expiresIn: "24h" },
 	);
 };
 

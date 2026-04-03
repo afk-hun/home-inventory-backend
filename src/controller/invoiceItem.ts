@@ -40,7 +40,7 @@ export const getInvoiceItem = (
 	res: Response,
 	next: NextFunction,
 ) => {
-	const { id } = req.params;
+	const id = req.params.id as string;
 
 	if (!id) {
 		const error = new Error("Invoice item ID is required") as any;

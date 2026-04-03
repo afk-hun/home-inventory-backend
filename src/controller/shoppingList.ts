@@ -45,7 +45,7 @@ export const getShoppingList = (
 	next: NextFunction,
 ) => {
 	const householdId = req.householdId;
-	const { shoppingListId } = req.params;
+	const shoppingListId = req.params.shoppingListId as string;
 
 	if (!householdId) {
 		const error = new Error("Household not found") as any;
