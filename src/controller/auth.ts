@@ -2,8 +2,11 @@ import { NextFunction, Request, Response } from "express";
 import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { eq } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
 import { CSRF_MAX_AGE_MS } from "./csrf";
-import { prisma } from "../lib/prisma";
+import { db } from "../lib/db";
+import { users, households, householdMembers } from "../db/schema";
 
 const ACCESS_TOKEN_COOKIE_NAME = "auth_token";
 const REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
@@ -162,25 +165,24 @@ export const signup = (req: Request, res: Response, next: NextFunction) => {
 	bcrypt
 		.hash(password, 12)
 		.then((hashedPassword) => {
-			return prisma.user.create({
-				data: { email, name, password: hashedPassword },
-			});
-		})
-		.then((result) => {
-			res.status(201).json({
-				message: "User created!",
-				userId: result.id,
-			});
+			try {
+				const id = createId();
+				db.insert(users).values({ id, email, name, password: hashedPassword }).run();
+				res.status(201).json({ message: "User created!", userId: id });
+			} catch (err: any) {
+				if (
+					err?.code === "SQLITE_CONSTRAINT_UNIQUE" ||
+					err?.message?.includes("UNIQUE constraint failed")
+				) {
+					const error = new CustomError("E-mail address already exists!");
+					error.statusCode = 422;
+					throw error;
+				}
+				throw err;
+			}
 		})
 		.catch((err: any) => {
-			if (err?.code === "P2002") {
-				const error = new CustomError("E-mail address already exists!");
-				error.statusCode = 422;
-				return next(error);
-			}
-			if (!err.statusCode) {
-				err.statusCode = 500;
-			}
+			if (!err.statusCode) err.statusCode = 500;
 			next(err);
 		});
 };
@@ -202,63 +204,47 @@ export const login = (req: Request, res: Response, next: NextFunction) => {
 	const email = req.body.email;
 	const password = req.body.password;
 
-	let loadedUserId: string;
-	let loadedUserEmail: string;
+	try {
+		const user = db.query.users.findFirst({ where: (t, { eq }) => eq(t.email, email) }).sync();
+		if (!user) {
+			const error = new CustomError("Email or password is incorrect.");
+			error.statusCode = 401;
+			return next(error);
+		}
 
-	prisma.user
-		.findUnique({ where: { email } })
-		.then((user) => {
-			if (!user) {
-				const error = new CustomError(
-					"Email or password is incorrect.",
-				);
-				error.statusCode = 401;
-				throw error;
-			}
-			loadedUserId = user.id;
-			loadedUserEmail = user.email;
-			return bcrypt.compare(password, user.password);
-		})
-		.then((isEqual) => {
-			if (!isEqual) {
-				const error = new CustomError(
-					"Email or password is incorrect.",
-				);
-				error.statusCode = 401;
-				throw error;
-			}
-			const basePayload = {
-				email: loadedUserEmail,
-				userId: loadedUserId,
-			};
-			const accessToken = signAccessToken(basePayload);
-			const refreshToken = signRefreshToken(basePayload);
-			setAccessTokenCookie(res, accessToken);
-			setRefreshTokenCookie(res, refreshToken);
-			setUserCookie(res, loadedUserId);
-			return prisma.household.findFirst({
-				where: { ownerId: loadedUserId },
+		bcrypt
+			.compare(password, user.password)
+			.then((isEqual) => {
+				if (!isEqual) {
+					const error = new CustomError("Email or password is incorrect.");
+					error.statusCode = 401;
+					return next(error);
+				}
+
+				const basePayload = { email: user.email, userId: user.id };
+				const accessToken = signAccessToken(basePayload);
+				const refreshToken = signRefreshToken(basePayload);
+				setAccessTokenCookie(res, accessToken);
+				setRefreshTokenCookie(res, refreshToken);
+				setUserCookie(res, user.id);
+
+				const household = db.query.households.findFirst({
+					where: (t, { eq }) => eq(t.ownerId, user.id),
+				}).sync();
+				if (household) {
+					setHouseholdCookie(res, household.id);
+				}
+
+				res.status(200).json({ message: "Logged in successfully." });
+			})
+			.catch((err: any) => {
+				if (!err.statusCode) err.statusCode = 500;
+				next(err);
 			});
-		})
-		.then((household) => {
-			// if (!household) {
-			// 	const error = new CustomError("No household found for user.");
-			// 	error.statusCode = 404;
-			// 	throw error;
-			// }
-			if (household) {
-				setHouseholdCookie(res, household.id);
-			}
-			res.status(200).json({
-				message: "Logged in successfully.",
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) {
-				err.statusCode = 500;
-			}
-			next(err);
-		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const refreshToken = (req: Request, res: Response) => {

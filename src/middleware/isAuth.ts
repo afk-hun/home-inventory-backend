@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { prisma } from "../lib/prisma";
+import { db } from "../lib/db";
 import { signAndSetAccessToken } from "../controller/auth";
 
 export const isAuth = (req: Request, res: Response, next: NextFunction) => {
@@ -30,22 +30,19 @@ export const isAuth = (req: Request, res: Response, next: NextFunction) => {
 		return res.status(401).json({ message: "Unauthorized" });
 	}
 
-	prisma.user
-		.findUnique({
-			where: { id: userId },
-			select: { id: true, name: true, email: true },
-		})
-		.then((user) => {
-			if (!user) {
-				res.status(401).json({ message: "Unauthorized" });
-				return;
-			}
-			req.user = user;
-			req.householdId = req.cookies?.household_id;
-			signAndSetAccessToken(res, user.email, user.id);
-			next();
-		})
-		.catch(() => {
-			res.status(401).json({ message: "Unauthorized" });
-		});
+	try {
+		const user = db.query.users.findFirst({
+			where: (t, { eq }) => eq(t.id, userId),
+			columns: { id: true, name: true, email: true },
+		}).sync();
+		if (!user) {
+			return res.status(401).json({ message: "Unauthorized" });
+		}
+		req.user = user as any;
+		req.householdId = req.cookies?.household_id;
+		signAndSetAccessToken(res, user.email, user.id);
+		next();
+	} catch {
+		res.status(401).json({ message: "Unauthorized" });
+	}
 };

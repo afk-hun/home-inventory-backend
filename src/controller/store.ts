@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from "express";
-
-import { prisma } from "../lib/prisma";
+import { eq, and, count } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
+import { db } from "../lib/db";
+import { stores } from "../db/schema";
 import { toMongoDoc } from "../lib/serialize";
 
 export const getStore = (req: Request, res: Response, next: NextFunction) => {
@@ -20,20 +22,20 @@ export const getStore = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	prisma.store
-		.findFirst({ where: { id, householdId } })
-		.then((store) => {
-			if (!store) {
-				const error = new Error("Store not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			res.status(200).json({ store: toMongoDoc(store) });
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const store = db.query.stores.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, id), eq(t.householdId, householdId)),
+		}).sync();
+		if (!store) {
+			const error = new Error("Store not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		res.status(200).json({ store: toMongoDoc(store) });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const getStores = (req: Request, res: Response, next: NextFunction) => {
@@ -55,27 +57,26 @@ export const getStores = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	prisma.store
-		.count({ where: { householdId } })
-		.then((total) => {
-			return prisma.store
-				.findMany({ where: { householdId }, skip, take: limit })
-				.then((stores) => {
-					res.status(200).json({
-						stores: stores.map(toMongoDoc),
-						pagination: {
-							total,
-							page,
-							limit,
-							totalPages: Math.ceil(total / limit),
-						},
-					});
-				});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const [{ total }] = db.select({ total: count() }).from(stores).where(eq(stores.householdId, householdId)).all();
+		const result = db.query.stores.findMany({
+			where: (t, { eq }) => eq(t.householdId, householdId),
+			limit,
+			offset: skip,
+		}).sync();
+		res.status(200).json({
+			stores: result.map(toMongoDoc),
+			pagination: {
+				total,
+				page,
+				limit,
+				totalPages: Math.ceil(total / limit),
+			},
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const createStore = (
@@ -105,15 +106,15 @@ export const createStore = (
 		return next(error);
 	}
 
-	prisma.store
-		.create({ data: { householdId, name } })
-		.then((result) => {
-			res.status(201).json({ message: "Store created!", store: toMongoDoc(result) });
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const id = createId();
+		db.insert(stores).values({ id, householdId, name }).run();
+		const result = db.query.stores.findFirst({ where: (t, { eq }) => eq(t.id, id) }).sync()!;
+		res.status(201).json({ message: "Store created!", store: toMongoDoc(result) });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const updateStore = (
@@ -130,30 +131,29 @@ export const updateStore = (
 		return next(error);
 	}
 
-	prisma.store
-		.findFirst({ where: { id: storeId, householdId } })
-		.then((store) => {
-			if (!store) {
-				const error = new Error("Store not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
+	try {
+		const store = db.query.stores.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, storeId), eq(t.householdId, householdId!)),
+		}).sync();
+		if (!store) {
+			const error = new Error("Store not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
 
-			const updateData: any = {};
-			if (name !== undefined) updateData.name = name;
+		const updateData: any = {};
+		if (name !== undefined) updateData.name = name;
 
-			return prisma.store.update({ where: { id: storeId }, data: updateData });
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Store updated successfully",
-				store: toMongoDoc(updated),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+		db.update(stores).set(updateData).where(eq(stores.id, storeId)).run();
+		const updated = db.query.stores.findFirst({ where: (t, { eq }) => eq(t.id, storeId) }).sync()!;
+		res.status(200).json({
+			message: "Store updated successfully",
+			store: toMongoDoc(updated),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const deleteStore = (
@@ -170,21 +170,19 @@ export const deleteStore = (
 		return next(error);
 	}
 
-	prisma.store
-		.findFirst({ where: { id: storeId, householdId } })
-		.then((store) => {
-			if (!store) {
-				const error = new Error("Store not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.store.delete({ where: { id: storeId } });
-		})
-		.then(() => {
-			res.status(200).json({ message: "Store deleted successfully" });
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const store = db.query.stores.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, storeId), eq(t.householdId, householdId!)),
+		}).sync();
+		if (!store) {
+			const error = new Error("Store not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.delete(stores).where(eq(stores.id, storeId)).run();
+		res.status(200).json({ message: "Store deleted successfully" });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };

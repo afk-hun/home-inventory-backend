@@ -1,40 +1,61 @@
-import { beforeAll, afterAll, afterEach } from "vitest";
-import { prisma } from "../lib/prisma";
+import { beforeAll, afterEach } from "vitest";
+import { db } from "../lib/db";
+import {
+	meals,
+	ingredients,
+	shoppingListItems,
+	shoppingLists,
+	monthlyCookingSchedules,
+	recipes,
+	invoiceElements,
+	invoices,
+	invoiceItems,
+	shelfItems,
+	shelves,
+	itemConnectedStores,
+	items,
+	itemTypes,
+	shelfTypes,
+	shelfPlaceTypes,
+	unitTypes,
+	mealTypes,
+	recipeTypes,
+	stores,
+	householdMembers,
+	households,
+	users,
+} from "../db/schema";
 
-beforeAll(async () => {
+beforeAll(() => {
 	process.env.JWT_SECRET = "test-secret-key-for-vitest";
 	process.env.NODE_ENV = "test";
 	process.env.CORS_ORIGIN = "http://localhost:5173";
 	process.env.DATABASE_URL = "file:./test.db";
 });
 
-afterEach(async () => {
+afterEach(() => {
 	// Delete all records in reverse dependency order
-	await prisma.meal.deleteMany();
-	await prisma.ingredient.deleteMany();
-	await prisma.shoppingListItem.deleteMany();
-	await prisma.shoppingList.deleteMany();
-	await prisma.monthlyCookingSchedule.deleteMany();
-	await prisma.recipe.deleteMany();
-	await prisma.invoiceElement.deleteMany();
-	await prisma.invoice.deleteMany();
-	await prisma.invoiceItem.deleteMany();
-	await prisma.shelfItem.deleteMany();
-	await prisma.shelf.deleteMany();
-	await prisma.itemConnectedStore.deleteMany();
-	await prisma.item.deleteMany();
-	await prisma.itemType.deleteMany();
-	await prisma.shelfType.deleteMany();
-	await prisma.shelfPlaceType.deleteMany();
-	await prisma.unitType.deleteMany();
-	await prisma.mealType.deleteMany();
-	await prisma.recipeType.deleteMany();
-	await prisma.store.deleteMany();
-	await prisma.householdMember.deleteMany();
-	await prisma.household.deleteMany();
-	await prisma.user.deleteMany();
-});
-
-afterAll(async () => {
-	await prisma.$disconnect();
+	db.delete(meals).run();
+	db.delete(ingredients).run();
+	db.delete(shoppingListItems).run();
+	db.delete(shoppingLists).run();
+	db.delete(monthlyCookingSchedules).run();
+	db.delete(recipes).run();
+	db.delete(invoiceElements).run();
+	db.delete(invoices).run();
+	db.delete(invoiceItems).run();
+	db.delete(shelfItems).run();
+	db.delete(shelves).run();
+	db.delete(itemConnectedStores).run();
+	db.delete(items).run();
+	db.delete(itemTypes).run();
+	db.delete(shelfTypes).run();
+	db.delete(shelfPlaceTypes).run();
+	db.delete(unitTypes).run();
+	db.delete(mealTypes).run();
+	db.delete(recipeTypes).run();
+	db.delete(stores).run();
+	db.delete(householdMembers).run();
+	db.delete(households).run();
+	db.delete(users).run();
 });

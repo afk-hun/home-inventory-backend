@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from "express";
-
-import { prisma } from "../lib/prisma";
-import { toMongoDoc } from "../lib/serialize";
+import { eq } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
+import { db } from "../lib/db";
+import { unitTypes } from "../db/schema";
 
 export const getUnitTypes = (
 	req: Request,
@@ -23,21 +24,21 @@ export const getUnitTypes = (
 		return next(error);
 	}
 
-	prisma.unitType
-		.findMany({ where: { householdId } })
-		.then((unitTypes) => {
-			res.status(200).json({
-				unitTypes: unitTypes.map((ut) => ({
-					_id: ut.id,
-					name: ut.name,
-					householdId: ut.householdId,
-				})),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const result = db.query.unitTypes.findMany({
+			where: (t, { eq }) => eq(t.householdId, householdId),
+		}).sync();
+		res.status(200).json({
+			unitTypes: result.map((ut) => ({
+				_id: ut.id,
+				name: ut.name,
+				householdId: ut.householdId,
+			})),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const createUnitType = (
@@ -55,18 +56,17 @@ export const createUnitType = (
 		return next(error);
 	}
 
-	prisma.unitType
-		.create({ data: { name, householdId } })
-		.then((result) => {
-			res.status(201).json({
-				message: "Unit type created!",
-				unitType: toMongoDoc(result),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const id = createId();
+		db.insert(unitTypes).values({ id, name, householdId }).run();
+		res.status(201).json({
+			message: "Unit type created!",
+			unitType: { _id: id, name, householdId },
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const renameUnitType = (
@@ -86,29 +86,22 @@ export const renameUnitType = (
 		return next(error);
 	}
 
-	prisma.unitType
-		.findUnique({ where: { id: unitTypeId } })
-		.then((unitType) => {
-			if (!unitType) {
-				const error = new Error("Unit type not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.unitType.update({
-				where: { id: unitTypeId },
-				data: { name: newName },
-			});
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Unit type renamed successfully",
-				unitTypeId: updated.id,
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const unitType = db.query.unitTypes.findFirst({ where: (t, { eq }) => eq(t.id, unitTypeId) }).sync();
+		if (!unitType) {
+			const error = new Error("Unit type not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.update(unitTypes).set({ name: newName }).where(eq(unitTypes.id, unitTypeId)).run();
+		res.status(200).json({
+			message: "Unit type renamed successfully",
+			unitTypeId,
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const deleteUnitType = (
@@ -124,23 +117,17 @@ export const deleteUnitType = (
 		return next(error);
 	}
 
-	prisma.unitType
-		.findUnique({ where: { id: unitTypeId } })
-		.then((unitType) => {
-			if (!unitType) {
-				const error = new Error("Unit type not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.unitType.delete({ where: { id: unitTypeId } });
-		})
-		.then(() => {
-			res.status(200).json({
-				message: "Unit type deleted successfully",
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const unitType = db.query.unitTypes.findFirst({ where: (t, { eq }) => eq(t.id, unitTypeId) }).sync();
+		if (!unitType) {
+			const error = new Error("Unit type not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.delete(unitTypes).where(eq(unitTypes.id, unitTypeId)).run();
+		res.status(200).json({ message: "Unit type deleted successfully" });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };

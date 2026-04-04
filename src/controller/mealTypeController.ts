@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from "express";
-
-import { prisma } from "../lib/prisma";
-import { toMongoDoc } from "../lib/serialize";
+import { eq } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
+import { db } from "../lib/db";
+import { mealTypes } from "../db/schema";
 
 export const getMealTypes = (
 	req: Request,
@@ -23,21 +24,21 @@ export const getMealTypes = (
 		return next(error);
 	}
 
-	prisma.mealType
-		.findMany({ where: { householdId } })
-		.then((mealTypes) => {
-			res.status(200).json({
-				mealTypes: mealTypes.map((mt) => ({
-					_id: mt.id,
-					name: mt.name,
-					householdId: mt.householdId,
-				})),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const result = db.query.mealTypes.findMany({
+			where: (t, { eq }) => eq(t.householdId, householdId),
+		}).sync();
+		res.status(200).json({
+			mealTypes: result.map((mt) => ({
+				_id: mt.id,
+				name: mt.name,
+				householdId: mt.householdId,
+			})),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const createMealType = (
@@ -55,18 +56,17 @@ export const createMealType = (
 		return next(error);
 	}
 
-	prisma.mealType
-		.create({ data: { name, householdId } })
-		.then((result) => {
-			res.status(201).json({
-				message: "Meal type created!",
-				mealType: toMongoDoc(result),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const id = createId();
+		db.insert(mealTypes).values({ id, name, householdId }).run();
+		res.status(201).json({
+			message: "Meal type created!",
+			mealType: { _id: id, name, householdId },
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const renameMealType = (
@@ -86,29 +86,22 @@ export const renameMealType = (
 		return next(error);
 	}
 
-	prisma.mealType
-		.findUnique({ where: { id: mealTypeId } })
-		.then((mealType) => {
-			if (!mealType) {
-				const error = new Error("Meal type not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.mealType.update({
-				where: { id: mealTypeId },
-				data: { name: newName },
-			});
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Meal type renamed successfully",
-				mealTypeId: updated.id,
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const mealType = db.query.mealTypes.findFirst({ where: (t, { eq }) => eq(t.id, mealTypeId) }).sync();
+		if (!mealType) {
+			const error = new Error("Meal type not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.update(mealTypes).set({ name: newName }).where(eq(mealTypes.id, mealTypeId)).run();
+		res.status(200).json({
+			message: "Meal type renamed successfully",
+			mealTypeId,
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const deleteMealType = (
@@ -124,21 +117,17 @@ export const deleteMealType = (
 		return next(error);
 	}
 
-	prisma.mealType
-		.findUnique({ where: { id: mealTypeId } })
-		.then((mealType) => {
-			if (!mealType) {
-				const error = new Error("Meal type not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.mealType.delete({ where: { id: mealTypeId } });
-		})
-		.then(() => {
-			res.status(200).json({ message: "Meal type deleted successfully" });
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const mealType = db.query.mealTypes.findFirst({ where: (t, { eq }) => eq(t.id, mealTypeId) }).sync();
+		if (!mealType) {
+			const error = new Error("Meal type not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.delete(mealTypes).where(eq(mealTypes.id, mealTypeId)).run();
+		res.status(200).json({ message: "Meal type deleted successfully" });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };

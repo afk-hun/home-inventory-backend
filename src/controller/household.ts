@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from "express";
-
-import { prisma } from "../lib/prisma";
-
+import { eq } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
+import { db } from "../lib/db";
+import { households, householdMembers } from "../db/schema";
 import { setHouseholdCookie } from "./auth";
 
 export const setHousehold = (
@@ -36,26 +37,24 @@ export const getHouseholds = (
 		return next(error);
 	}
 
-	prisma.household
-		.findMany({ where: { ownerId: user.id } })
-		.then((households) => {
-			res.status(200).json({
-				households: households.map((h) => ({
-					_id: h.id,
-					name: h.name,
-					members: [],
-				})),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) {
-				err.statusCode = 500;
-			}
-			next(err);
+	try {
+		const result = db.query.households.findMany({
+			where: (t, { eq }) => eq(t.ownerId, user.id),
+		}).sync();
+		res.status(200).json({
+			households: result.map((h) => ({
+				_id: h.id,
+				name: h.name,
+				members: [],
+			})),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
-export const createHousehold = async (
+export const createHousehold = (
 	req: Request,
 	res: Response,
 	next: NextFunction,
@@ -69,32 +68,22 @@ export const createHousehold = async (
 		return next(error);
 	}
 
-	prisma.household
-		.create({
-			data: {
+	try {
+		const householdId = createId();
+		db.insert(households).values({ id: householdId, name, ownerId: owner.id }).run();
+		db.insert(householdMembers).values({ householdId, userId: owner.id }).run();
+		res.status(201).json({
+			message: "Household created!",
+			household: {
+				_id: householdId,
 				name,
-				ownerId: owner.id,
-				members: {
-					create: [{ userId: owner.id }],
-				},
+				members: [],
 			},
-		})
-		.then((result) => {
-			res.status(201).json({
-				message: "Household created!",
-				household: {
-					_id: result.id,
-					name: result.name,
-					members: [],
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) {
-				err.statusCode = 500;
-			}
-			next(err);
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const renameHousehold = (
@@ -113,31 +102,22 @@ export const renameHousehold = (
 		return next(error);
 	}
 
-	prisma.household
-		.findUnique({ where: { id: householdId } })
-		.then((household) => {
-			if (!household) {
-				const error = new Error("Household not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.household.update({
-				where: { id: householdId },
-				data: { name: newName },
-			});
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Household renamed successfully",
-				householdId: updated.id,
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) {
-				err.statusCode = 500;
-			}
-			next(err);
+	try {
+		const household = db.query.households.findFirst({ where: (t, { eq }) => eq(t.id, householdId) }).sync();
+		if (!household) {
+			const error = new Error("Household not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.update(households).set({ name: newName }).where(eq(households.id, householdId)).run();
+		res.status(200).json({
+			message: "Household renamed successfully",
+			householdId,
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const deleteHousehold = (
@@ -153,25 +133,17 @@ export const deleteHousehold = (
 		return next(error);
 	}
 
-	prisma.household
-		.findUnique({ where: { id: householdId } })
-		.then((household) => {
-			if (!household) {
-				const error = new Error("Household not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.household.delete({ where: { id: householdId } });
-		})
-		.then(() => {
-			res.status(200).json({
-				message: "Household deleted successfully",
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) {
-				err.statusCode = 500;
-			}
-			next(err);
-		});
+	try {
+		const household = db.query.households.findFirst({ where: (t, { eq }) => eq(t.id, householdId) }).sync();
+		if (!household) {
+			const error = new Error("Household not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.delete(households).where(eq(households.id, householdId)).run();
+		res.status(200).json({ message: "Household deleted successfully" });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };

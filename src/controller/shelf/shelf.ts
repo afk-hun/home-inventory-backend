@@ -1,8 +1,30 @@
 import { NextFunction, Request, Response } from "express";
-
-import { prisma } from "../../lib/prisma";
+import { eq, and, count } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
+import { db } from "../../lib/db";
+import { shelves, shelfItems } from "../../db/schema";
 import { toMongoDoc } from "../../lib/serialize";
 import { toBase } from "../../lib/units";
+
+function shelfWithItems(id: string) {
+	return db.query.shelves.findFirst({
+		where: (t, { eq }) => eq(t.id, id),
+		with: { items: { with: { item: { columns: { id: true, name: true } } } } },
+	}).sync();
+}
+
+function mapShelfResponse(shelf: NonNullable<ReturnType<typeof shelfWithItems>>) {
+	return {
+		...toMongoDoc(shelf),
+		items: shelf.items.map((si) => ({
+			_id: si.id,
+			item: { _id: si.item.id, name: si.item.name },
+			itemName: si.itemName,
+			quantity: si.quantity,
+			unit: si.unit,
+		})),
+	};
+}
 
 export const getShelves = (
 	req: Request,
@@ -20,27 +42,26 @@ export const getShelves = (
 		return next(error);
 	}
 
-	prisma.shelf
-		.count({ where: { householdId } })
-		.then((total) => {
-			return prisma.shelf
-				.findMany({ where: { householdId }, skip, take: limit })
-				.then((shelves) => {
-					res.status(200).json({
-						shelves: shelves.map(toMongoDoc),
-						pagination: {
-							total,
-							page,
-							limit,
-							totalPages: Math.ceil(total / limit),
-						},
-					});
-				});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const [{ total }] = db.select({ total: count() }).from(shelves).where(eq(shelves.householdId, householdId)).all();
+		const result = db.query.shelves.findMany({
+			where: (t, { eq }) => eq(t.householdId, householdId),
+			limit,
+			offset: skip,
+		}).sync();
+		res.status(200).json({
+			shelves: result.map(toMongoDoc),
+			pagination: {
+				total,
+				page,
+				limit,
+				totalPages: Math.ceil(total / limit),
+			},
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const getShelf = (req: Request, res: Response, next: NextFunction) => {
@@ -53,38 +74,21 @@ export const getShelf = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	prisma.shelf
-		.findFirst({
-			where: { id, householdId },
-			include: {
-				items: {
-					include: { item: { select: { id: true, name: true } } },
-				},
-			},
-		})
-		.then((shelf) => {
-			if (!shelf) {
-				const error = new Error("Shelf not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			res.status(200).json({
-				shelf: {
-					...toMongoDoc(shelf),
-					items: shelf.items.map((si) => ({
-						_id: si.id,
-						item: { _id: si.item.id, name: si.item.name },
-						itemName: si.itemName,
-						quantity: si.quantity,
-						unit: si.unit,
-					})),
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const shelf = db.query.shelves.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, id), eq(t.householdId, householdId)),
+			with: { items: { with: { item: { columns: { id: true, name: true } } } } },
+		}).sync();
+		if (!shelf) {
+			const error = new Error("Shelf not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		res.status(200).json({ shelf: mapShelfResponse(shelf) });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const createShelf = (
@@ -107,22 +111,21 @@ export const createShelf = (
 		return next(error);
 	}
 
-	prisma.shelf
-		.create({
-			data: {
-				householdId,
-				name,
-				...(place !== undefined && { place }),
-				...(type !== undefined && { type }),
-			},
-		})
-		.then((result) => {
-			res.status(201).json({ message: "Shelf created!", shelf: toMongoDoc(result) });
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const id = createId();
+		db.insert(shelves).values({
+			id,
+			householdId,
+			name,
+			...(place !== undefined && { place }),
+			...(type !== undefined && { type }),
+		}).run();
+		const result = db.query.shelves.findFirst({ where: (t, { eq }) => eq(t.id, id) }).sync()!;
+		res.status(201).json({ message: "Shelf created!", shelf: toMongoDoc(result) });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const updateShelf = (
@@ -145,32 +148,31 @@ export const updateShelf = (
 		return next(error);
 	}
 
-	prisma.shelf
-		.findFirst({ where: { id: shelfId, householdId } })
-		.then((shelf) => {
-			if (!shelf) {
-				const error = new Error("Shelf not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
+	try {
+		const shelf = db.query.shelves.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, shelfId), eq(t.householdId, householdId)),
+		}).sync();
+		if (!shelf) {
+			const error = new Error("Shelf not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
 
-			const updateData: any = {};
-			if (name !== undefined) updateData.name = name;
-			if (place !== undefined) updateData.place = place;
-			if (type !== undefined) updateData.type = type;
+		const updateData: any = {};
+		if (name !== undefined) updateData.name = name;
+		if (place !== undefined) updateData.place = place;
+		if (type !== undefined) updateData.type = type;
 
-			return prisma.shelf.update({ where: { id: shelfId }, data: updateData });
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Shelf updated successfully",
-				shelf: toMongoDoc(updated),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+		db.update(shelves).set(updateData).where(eq(shelves.id, shelfId)).run();
+		const updated = db.query.shelves.findFirst({ where: (t, { eq }) => eq(t.id, shelfId) }).sync()!;
+		res.status(200).json({
+			message: "Shelf updated successfully",
+			shelf: toMongoDoc(updated),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const deleteShelf = (
@@ -193,23 +195,21 @@ export const deleteShelf = (
 		return next(error);
 	}
 
-	prisma.shelf
-		.findFirst({ where: { id: shelfId, householdId } })
-		.then((shelf) => {
-			if (!shelf) {
-				const error = new Error("Shelf not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.shelf.delete({ where: { id: shelfId } });
-		})
-		.then(() => {
-			res.status(200).json({ message: "Shelf deleted successfully" });
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const shelf = db.query.shelves.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, shelfId), eq(t.householdId, householdId)),
+		}).sync();
+		if (!shelf) {
+			const error = new Error("Shelf not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.delete(shelves).where(eq(shelves.id, shelfId)).run();
+		res.status(200).json({ message: "Shelf deleted successfully" });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const addShelfItem = (
@@ -234,61 +234,40 @@ export const addShelfItem = (
 		return next(error);
 	}
 
-	prisma.shelf
-		.findFirst({ where: { id: shelfId, householdId } })
-		.then((shelf) => {
-			if (!shelf) {
-				const error = new Error("Shelf not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
+	try {
+		const shelf = db.query.shelves.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, shelfId), eq(t.householdId, householdId)),
+		}).sync();
+		if (!shelf) {
+			const error = new Error("Shelf not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
 
-			const { baseQuantity, baseUnit } = unit !== undefined
-				? toBase(quantity, unit)
-				: { baseQuantity: null, baseUnit: null };
+		const { baseQuantity, baseUnit } = unit !== undefined
+			? toBase(quantity, unit)
+			: { baseQuantity: null, baseUnit: null };
 
-			return prisma.shelfItem
-				.create({
-					data: {
-						shelfId,
-						itemId,
-						quantity,
-						...(itemName !== undefined && { itemName }),
-						...(unit !== undefined && { unit }),
-						...(baseQuantity !== null && { baseQuantity }),
-						...(baseUnit !== null && { baseUnit }),
-					},
-				})
-				.then(() => {
-					return prisma.shelf.findFirst({
-						where: { id: shelfId },
-						include: {
-							items: {
-								include: { item: { select: { id: true, name: true } } },
-							},
-						},
-					});
-				});
-		})
-		.then((updated: any) => {
-			res.status(200).json({
-				message: "Item added to shelf",
-				shelf: {
-					...toMongoDoc(updated),
-					items: updated.items.map((si: any) => ({
-						_id: si.id,
-						item: { _id: si.item.id, name: si.item.name },
-						itemName: si.itemName,
-						quantity: si.quantity,
-						unit: si.unit,
-					})),
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+		db.insert(shelfItems).values({
+			id: createId(),
+			shelfId,
+			itemId,
+			quantity,
+			...(itemName !== undefined && { itemName }),
+			...(unit !== undefined && { unit }),
+			...(baseQuantity !== null && { baseQuantity }),
+			...(baseUnit !== null && { baseUnit }),
+		}).run();
+
+		const updated = shelfWithItems(shelfId)!;
+		res.status(200).json({
+			message: "Item added to shelf",
+			shelf: mapShelfResponse(updated),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const removeShelfItem = (
@@ -311,53 +290,33 @@ export const removeShelfItem = (
 		return next(error);
 	}
 
-	prisma.shelf
-		.findFirst({ where: { id: shelfId, householdId } })
-		.then((shelf) => {
-			if (!shelf) {
-				const error = new Error("Shelf not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
+	try {
+		const shelf = db.query.shelves.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, shelfId), eq(t.householdId, householdId)),
+		}).sync();
+		if (!shelf) {
+			const error = new Error("Shelf not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
 
-			return prisma.shelfItem
-				.findFirst({ where: { id: shelfItemId, shelfId } })
-				.then((shelfItem) => {
-					if (!shelfItem) {
-						const error = new Error("Shelf item not found") as any;
-						error.statusCode = 404;
-						throw error;
-					}
-					return prisma.shelfItem.delete({ where: { id: shelfItemId } });
-				})
-				.then(() => {
-					return prisma.shelf.findFirst({
-						where: { id: shelfId },
-						include: {
-							items: {
-								include: { item: { select: { id: true, name: true } } },
-							},
-						},
-					});
-				});
-		})
-		.then((updated: any) => {
-			res.status(200).json({
-				message: "Item removed from shelf",
-				shelf: {
-					...toMongoDoc(updated),
-					items: updated.items.map((si: any) => ({
-						_id: si.id,
-						item: { _id: si.item.id, name: si.item.name },
-						itemName: si.itemName,
-						quantity: si.quantity,
-						unit: si.unit,
-					})),
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+		const shelfItem = db.query.shelfItems.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, shelfItemId), eq(t.shelfId, shelfId)),
+		}).sync();
+		if (!shelfItem) {
+			const error = new Error("Shelf item not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+
+		db.delete(shelfItems).where(eq(shelfItems.id, shelfItemId)).run();
+		const updated = shelfWithItems(shelfId)!;
+		res.status(200).json({
+			message: "Item removed from shelf",
+			shelf: mapShelfResponse(updated),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };

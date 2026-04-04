@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from "express";
-
-import { prisma } from "../../lib/prisma";
-import { toMongoDoc } from "../../lib/serialize";
+import { eq } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
+import { db } from "../../lib/db";
+import { itemTypes } from "../../db/schema";
 
 export const getItemTypes = (
 	req: Request,
@@ -23,21 +24,21 @@ export const getItemTypes = (
 		return next(error);
 	}
 
-	prisma.itemType
-		.findMany({ where: { householdId } })
-		.then((itemTypes) => {
-			res.status(200).json({
-				itemTypes: itemTypes.map((it) => ({
-					_id: it.id,
-					name: it.name,
-					householdId: it.householdId,
-				})),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const result = db.query.itemTypes.findMany({
+			where: (t, { eq }) => eq(t.householdId, householdId),
+		}).sync();
+		res.status(200).json({
+			itemTypes: result.map((it) => ({
+				_id: it.id,
+				name: it.name,
+				householdId: it.householdId,
+			})),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const createItemType = (
@@ -57,18 +58,17 @@ export const createItemType = (
 		return next(error);
 	}
 
-	prisma.itemType
-		.create({ data: { householdId, name } })
-		.then((result) => {
-			res.status(201).json({
-				message: "Item type created!",
-				itemType: toMongoDoc(result),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const id = createId();
+		db.insert(itemTypes).values({ id, householdId, name }).run();
+		res.status(201).json({
+			message: "Item type created!",
+			itemType: { _id: id, name, householdId },
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const renameItemType = (
@@ -87,29 +87,22 @@ export const renameItemType = (
 		return next(error);
 	}
 
-	prisma.itemType
-		.findUnique({ where: { id: itemTypeId } })
-		.then((itemType) => {
-			if (!itemType) {
-				const error = new Error("Item type not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.itemType.update({
-				where: { id: itemTypeId },
-				data: { name },
-			});
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Item type renamed successfully",
-				itemTypeId: updated.id,
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const itemType = db.query.itemTypes.findFirst({ where: (t, { eq }) => eq(t.id, itemTypeId) }).sync();
+		if (!itemType) {
+			const error = new Error("Item type not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.update(itemTypes).set({ name }).where(eq(itemTypes.id, itemTypeId)).run();
+		res.status(200).json({
+			message: "Item type renamed successfully",
+			itemTypeId,
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const deleteItemType = (
@@ -125,23 +118,17 @@ export const deleteItemType = (
 		return next(error);
 	}
 
-	prisma.itemType
-		.findUnique({ where: { id: itemTypeId } })
-		.then((itemType) => {
-			if (!itemType) {
-				const error = new Error("Item type not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.itemType.delete({ where: { id: itemTypeId } });
-		})
-		.then(() => {
-			res.status(200).json({
-				message: "Item type deleted successfully",
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const itemType = db.query.itemTypes.findFirst({ where: (t, { eq }) => eq(t.id, itemTypeId) }).sync();
+		if (!itemType) {
+			const error = new Error("Item type not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.delete(itemTypes).where(eq(itemTypes.id, itemTypeId)).run();
+		res.status(200).json({ message: "Item type deleted successfully" });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };

@@ -1,7 +1,29 @@
 import { NextFunction, Request, Response } from "express";
-
-import { prisma } from "../lib/prisma";
+import { eq } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
+import { db } from "../lib/db";
+import { invoices, invoiceElements } from "../db/schema";
 import { toMongoDoc } from "../lib/serialize";
+
+function mapInvoiceElements(items: any[]) {
+	return items.map((item) => ({
+		_id: item.id,
+		inStoreId: item.inStoreId,
+		inStoreName: item.inStoreName,
+		inStorePrice: item.inStorePrice,
+		inStoreUnitPrice: item.inStoreUnitPrice,
+		inStoreQuantity: item.inStoreQuantity,
+		inStoreUnit: item.inStoreUnit,
+		inStoreTaxType: item.inStoreTaxType,
+	}));
+}
+
+function invoiceWithItems(id: string) {
+	return db.query.invoices.findFirst({
+		where: (t, { eq }) => eq(t.id, id),
+		with: { invoiceItems: true },
+	}).sync();
+}
 
 export const getInvoices = (req: Request, res: Response, next: NextFunction) => {
 	const householdId = req.householdId;
@@ -13,34 +35,26 @@ export const getInvoices = (req: Request, res: Response, next: NextFunction) => 
 		return next(error);
 	}
 
-	const where: any = { householdId };
-	if (storeId && typeof storeId === "string") {
-		where.storeId = storeId;
-	}
-
-	prisma.invoice
-		.findMany({ where, include: { invoiceItems: true } })
-		.then((invoices) => {
-			res.status(200).json({
-				invoices: invoices.map((inv) => ({
-					...toMongoDoc(inv),
-					invoiceItems: inv.invoiceItems.map((item) => ({
-						_id: item.id,
-						inStoreId: item.inStoreId,
-						inStoreName: item.inStoreName,
-						inStorePrice: item.inStorePrice,
-						inStoreUnitPrice: item.inStoreUnitPrice,
-						inStoreQuantity: item.inStoreQuantity,
-						inStoreUnit: item.inStoreUnit,
-						inStoreTaxType: item.inStoreTaxType,
-					})),
-				})),
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const result = storeId && typeof storeId === "string"
+			? db.query.invoices.findMany({
+				where: (t, { and, eq }) => and(eq(t.householdId, householdId), eq(t.storeId, storeId)),
+				with: { invoiceItems: true },
+			}).sync()
+			: db.query.invoices.findMany({
+				where: (t, { eq }) => eq(t.householdId, householdId),
+				with: { invoiceItems: true },
+			}).sync();
+		res.status(200).json({
+			invoices: result.map((inv) => ({
+				...toMongoDoc(inv),
+				invoiceItems: mapInvoiceElements(inv.invoiceItems),
+			})),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const createInvoice = (
@@ -50,8 +64,7 @@ export const createInvoice = (
 ) => {
 	const user = req.user;
 	const householdId = req.householdId;
-	const { storeId, storeName, storeAddress, purchaseDate, invoiceItems } =
-		req.body;
+	const { storeId, storeName, storeAddress, purchaseDate, invoiceItems: itemsBody } = req.body;
 
 	if (!user) {
 		const error = new Error("User not found") as any;
@@ -73,52 +86,45 @@ export const createInvoice = (
 		return next(error);
 	}
 
-	const items: any[] = invoiceItems || [];
+	const itemsList: any[] = itemsBody || [];
 
-	prisma.invoice
-		.create({
-			data: {
-				householdId,
-				storeId,
-				storeName,
-				storeAddress,
-				purchaseDate: new Date(purchaseDate),
-				invoiceItems: {
-					create: items.map((item: any) => ({
-						inStoreId: item.inStoreId,
-						inStoreName: item.inStoreName,
-						inStorePrice: item.inStorePrice,
-						inStoreUnitPrice: item.inStoreUnitPrice,
-						inStoreQuantity: item.inStoreQuantity,
-						inStoreUnit: item.inStoreUnit,
-						inStoreTaxType: item.inStoreTaxType,
-					})),
-				},
+	try {
+		const id = createId();
+		db.insert(invoices).values({
+			id,
+			householdId,
+			storeId,
+			storeName,
+			storeAddress,
+			purchaseDate: new Date(purchaseDate),
+		}).run();
+		if (itemsList.length > 0) {
+			db.insert(invoiceElements).values(
+				itemsList.map((item: any) => ({
+					id: createId(),
+					invoiceId: id,
+					inStoreId: item.inStoreId,
+					inStoreName: item.inStoreName,
+					inStorePrice: item.inStorePrice,
+					inStoreUnitPrice: item.inStoreUnitPrice,
+					inStoreQuantity: item.inStoreQuantity,
+					inStoreUnit: item.inStoreUnit,
+					inStoreTaxType: item.inStoreTaxType,
+				})),
+			).run();
+		}
+		const result = invoiceWithItems(id)!;
+		res.status(201).json({
+			message: "Invoice created!",
+			invoice: {
+				...toMongoDoc(result),
+				invoiceItems: mapInvoiceElements(result.invoiceItems),
 			},
-			include: { invoiceItems: true },
-		})
-		.then((result) => {
-			res.status(201).json({
-				message: "Invoice created!",
-				invoice: {
-					...toMongoDoc(result),
-					invoiceItems: result.invoiceItems.map((item) => ({
-						_id: item.id,
-						inStoreId: item.inStoreId,
-						inStoreName: item.inStoreName,
-						inStorePrice: item.inStorePrice,
-						inStoreUnitPrice: item.inStoreUnitPrice,
-						inStoreQuantity: item.inStoreQuantity,
-						inStoreUnit: item.inStoreUnit,
-						inStoreTaxType: item.inStoreTaxType,
-					})),
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const updateInvoice = (
@@ -126,14 +132,7 @@ export const updateInvoice = (
 	res: Response,
 	next: NextFunction,
 ) => {
-	const {
-		invoiceId,
-		storeId,
-		storeName,
-		storeAddress,
-		purchaseDate,
-		invoiceItems,
-	} = req.body;
+	const { invoiceId, storeId, storeName, storeAddress, purchaseDate, invoiceItems: itemsBody } = req.body;
 
 	if (!invoiceId) {
 		const error = new Error("Invoice ID is required") as any;
@@ -141,73 +140,58 @@ export const updateInvoice = (
 		return next(error);
 	}
 
-	prisma.invoice
-		.findUnique({ where: { id: invoiceId } })
-		.then((invoice) => {
-			if (!invoice) {
-				const error = new Error("Invoice not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
+	try {
+		const invoice = db.query.invoices.findFirst({ where: (t, { eq }) => eq(t.id, invoiceId) }).sync();
+		if (!invoice) {
+			const error = new Error("Invoice not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
 
-			const updateData: any = {};
-			if (storeId !== undefined) updateData.storeId = storeId;
-			if (storeName !== undefined) updateData.storeName = storeName;
-			if (storeAddress !== undefined) updateData.storeAddress = storeAddress;
-			if (purchaseDate !== undefined) updateData.purchaseDate = new Date(purchaseDate);
+		const updateData: any = {};
+		if (storeId !== undefined) updateData.storeId = storeId;
+		if (storeName !== undefined) updateData.storeName = storeName;
+		if (storeAddress !== undefined) updateData.storeAddress = storeAddress;
+		if (purchaseDate !== undefined) updateData.purchaseDate = new Date(purchaseDate);
 
-			if (invoiceItems !== undefined) {
-				return prisma.$transaction([
-					prisma.invoiceElement.deleteMany({ where: { invoiceId } }),
-					prisma.invoice.update({
-						where: { id: invoiceId },
-						data: {
-							...updateData,
-							invoiceItems: {
-								create: (invoiceItems as any[]).map((item: any) => ({
-									inStoreId: item.inStoreId,
-									inStoreName: item.inStoreName,
-									inStorePrice: item.inStorePrice,
-									inStoreUnitPrice: item.inStoreUnitPrice,
-									inStoreQuantity: item.inStoreQuantity,
-									inStoreUnit: item.inStoreUnit,
-									inStoreTaxType: item.inStoreTaxType,
-								})),
-							},
-						},
-						include: { invoiceItems: true },
-					}),
-				]).then(([, updated]) => updated);
-			}
-
-			return prisma.invoice.update({
-				where: { id: invoiceId },
-				data: updateData,
-				include: { invoiceItems: true },
+		if (itemsBody !== undefined) {
+			db.transaction((tx) => {
+				tx.delete(invoiceElements).where(eq(invoiceElements.invoiceId, invoiceId)).run();
+				if (Object.keys(updateData).length > 0) {
+					tx.update(invoices).set(updateData).where(eq(invoices.id, invoiceId)).run();
+				}
+				if ((itemsBody as any[]).length > 0) {
+					tx.insert(invoiceElements).values(
+						(itemsBody as any[]).map((item: any) => ({
+							id: createId(),
+							invoiceId,
+							inStoreId: item.inStoreId,
+							inStoreName: item.inStoreName,
+							inStorePrice: item.inStorePrice,
+							inStoreUnitPrice: item.inStoreUnitPrice,
+							inStoreQuantity: item.inStoreQuantity,
+							inStoreUnit: item.inStoreUnit,
+							inStoreTaxType: item.inStoreTaxType,
+						})),
+					).run();
+				}
 			});
-		})
-		.then((updated: any) => {
-			res.status(200).json({
-				message: "Invoice updated successfully",
-				invoice: {
-					...toMongoDoc(updated),
-					invoiceItems: updated.invoiceItems.map((item: any) => ({
-						_id: item.id,
-						inStoreId: item.inStoreId,
-						inStoreName: item.inStoreName,
-						inStorePrice: item.inStorePrice,
-						inStoreUnitPrice: item.inStoreUnitPrice,
-						inStoreQuantity: item.inStoreQuantity,
-						inStoreUnit: item.inStoreUnit,
-						inStoreTaxType: item.inStoreTaxType,
-					})),
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+		} else if (Object.keys(updateData).length > 0) {
+			db.update(invoices).set(updateData).where(eq(invoices.id, invoiceId)).run();
+		}
+
+		const updated = invoiceWithItems(invoiceId)!;
+		res.status(200).json({
+			message: "Invoice updated successfully",
+			invoice: {
+				...toMongoDoc(updated),
+				invoiceItems: mapInvoiceElements(updated.invoiceItems),
+			},
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const deleteInvoice = (
@@ -223,21 +207,17 @@ export const deleteInvoice = (
 		return next(error);
 	}
 
-	prisma.invoice
-		.findUnique({ where: { id: invoiceId } })
-		.then((invoice) => {
-			if (!invoice) {
-				const error = new Error("Invoice not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.invoice.delete({ where: { id: invoiceId } });
-		})
-		.then(() => {
-			res.status(200).json({ message: "Invoice deleted successfully" });
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const invoice = db.query.invoices.findFirst({ where: (t, { eq }) => eq(t.id, invoiceId) }).sync();
+		if (!invoice) {
+			const error = new Error("Invoice not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.delete(invoices).where(eq(invoices.id, invoiceId)).run();
+		res.status(200).json({ message: "Invoice deleted successfully" });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };

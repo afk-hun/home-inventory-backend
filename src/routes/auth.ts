@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { body } from "express-validator";
-import { prisma } from "../lib/prisma";
+import { db } from "../lib/db";
 import { signup, login, logout, refreshToken } from "../controller/auth";
 import { validateCsrf } from "../middleware/csrf";
 import { loginLimiter, signupLimiter } from "../middleware/rateLimiter";
@@ -19,11 +19,11 @@ router.post(
 			.isEmail()
 			.withMessage("Please enter a valid email.")
 			.custom((value) => {
-				return prisma.user.findUnique({ where: { email: value } }).then((userDoc) => {
-					if (userDoc) {
-						return Promise.reject("E-Mail address already exists!");
-					}
-				});
+				const existing = db.query.users.findFirst({ where: (t, { eq }) => eq(t.email, value) }).sync();
+				if (existing) {
+					throw new Error("E-Mail address already exists!");
+				}
+				return true;
 			})
 			.normalizeEmail(),
 		body("password").trim().isLength({ min: 6 }),

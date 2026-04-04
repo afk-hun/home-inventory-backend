@@ -1,7 +1,22 @@
 import { NextFunction, Request, Response } from "express";
-
-import { prisma } from "../../lib/prisma";
+import { eq, and, or, count } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
+import { db } from "../../lib/db";
+import { items, itemConnectedStores } from "../../db/schema";
 import { toMongoDoc } from "../../lib/serialize";
+
+function mapItemResponse(item: any) {
+	return {
+		...toMongoDoc(item),
+		type: item.type ? { _id: item.type.id, name: item.type.name } : null,
+		connectedStores: (item.connectedStores ?? []).map((cs: any) => ({
+			storeId: cs.storeId,
+			storeName: cs.storeName,
+			storeItemId: cs.storeItemId,
+			storeItemName: cs.storeItemName,
+		})),
+	};
+}
 
 export const getItems = (req: Request, res: Response, next: NextFunction) => {
 	const user = req.user;
@@ -24,51 +39,40 @@ export const getItems = (req: Request, res: Response, next: NextFunction) => {
 
 	const storeId = req.query.storeId as string | undefined;
 
-	let whereClause: any = { householdId };
-	if (storeId) {
-		whereClause = {
-			householdId,
-			OR: [
-				{ connectedStores: { none: {} } },
-				{ connectedStores: { some: { storeId } } },
-			],
-		};
+	try {
+		if (storeId) {
+			// Items with no connected stores OR connected to this store
+			// Need to fetch all and filter in memory (OR queries on relations need subqueries)
+			const allItems = db.query.items.findMany({
+				where: (t, { eq }) => eq(t.householdId, householdId),
+				with: { connectedStores: true },
+			}).sync();
+			const filtered = allItems.filter(
+				(item) => item.connectedStores.length === 0 || item.connectedStores.some((cs) => cs.storeId === storeId),
+			);
+			const total = filtered.length;
+			const page_items = filtered.slice(skip, skip + limit);
+			res.status(200).json({
+				items: page_items.map(mapItemResponse),
+				pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+			});
+		} else {
+			const [{ total }] = db.select({ total: count() }).from(items).where(eq(items.householdId, householdId)).all();
+			const result = db.query.items.findMany({
+				where: (t, { eq }) => eq(t.householdId, householdId),
+				with: { connectedStores: true },
+				limit,
+				offset: skip,
+			}).sync();
+			res.status(200).json({
+				items: result.map(mapItemResponse),
+				pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+			});
+		}
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
 	}
-
-	prisma.item
-		.count({ where: whereClause })
-		.then((total) => {
-			return prisma.item
-				.findMany({
-					where: whereClause,
-					skip,
-					take: limit,
-					include: { connectedStores: true },
-				})
-				.then((items) => {
-					res.status(200).json({
-						items: items.map((item) => ({
-							...toMongoDoc(item),
-							connectedStores: item.connectedStores.map((cs) => ({
-								storeId: cs.storeId,
-								storeName: cs.storeName,
-								storeItemId: cs.storeItemId,
-								storeItemName: cs.storeItemName,
-							})),
-						})),
-						pagination: {
-							total,
-							page,
-							limit,
-							totalPages: Math.ceil(total / limit),
-						},
-					});
-				});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
 };
 
 export const getItem = (req: Request, res: Response, next: NextFunction) => {
@@ -88,43 +92,30 @@ export const getItem = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	prisma.item
-		.findFirst({
-			where: { id, householdId },
-			include: {
-				type: { select: { id: true, name: true } },
+	try {
+		const item = db.query.items.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, id), eq(t.householdId, householdId)),
+			with: {
+				type: { columns: { id: true, name: true } },
 				connectedStores: true,
 			},
-		})
-		.then((item) => {
-			if (!item) {
-				const error = new Error("Item not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			res.status(200).json({
-				item: {
-					...toMongoDoc(item),
-					type: item.type ? { _id: item.type.id, name: item.type.name } : null,
-					connectedStores: item.connectedStores.map((cs) => ({
-						storeId: cs.storeId,
-						storeName: cs.storeName,
-						storeItemId: cs.storeItemId,
-						storeItemName: cs.storeItemName,
-					})),
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+		}).sync();
+		if (!item) {
+			const error = new Error("Item not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		res.status(200).json({ item: mapItemResponse(item) });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const createItem = (req: Request, res: Response, next: NextFunction) => {
 	const user = req.user;
 	const householdId = req.householdId;
-	const { name, type, connectedStores } = req.body;
+	const { name, type, connectedStores: csBody } = req.body;
 
 	if (!user) {
 		const error = new Error("User not found") as any;
@@ -144,48 +135,45 @@ export const createItem = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	const stores: any[] = connectedStores || [];
+	const storesList: any[] = csBody || [];
 
-	prisma.item
-		.create({
-			data: {
-				householdId,
-				name,
-				...(type !== undefined && { typeId: type }),
-				connectedStores: {
-					create: stores.map((cs: any) => ({
-						storeId: cs.storeId,
-						storeName: cs.storeName,
-						storeItemId: cs.storeItemId || "",
-						storeItemName: cs.storeItemName || "",
-					})),
-				},
-			},
-			include: { connectedStores: true },
-		})
-		.then((result) => {
-			res.status(201).json({
-				message: "Item created!",
-				item: {
-					...toMongoDoc(result),
-					connectedStores: result.connectedStores.map((cs) => ({
-						storeId: cs.storeId,
-						storeName: cs.storeName,
-						storeItemId: cs.storeItemId,
-						storeItemName: cs.storeItemName,
-					})),
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+	try {
+		const id = createId();
+		db.insert(items).values({
+			id,
+			householdId,
+			name,
+			...(type !== undefined && { typeId: type }),
+		}).run();
+		if (storesList.length > 0) {
+			db.insert(itemConnectedStores).values(
+				storesList.map((cs: any) => ({
+					id: createId(),
+					itemId: id,
+					storeId: cs.storeId,
+					storeName: cs.storeName,
+					storeItemId: cs.storeItemId || "",
+					storeItemName: cs.storeItemName || "",
+				})),
+			).run();
+		}
+		const result = db.query.items.findFirst({
+			where: (t, { eq }) => eq(t.id, id),
+			with: { connectedStores: true },
+		}).sync()!;
+		res.status(201).json({
+			message: "Item created!",
+			item: mapItemResponse(result),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const updateItem = (req: Request, res: Response, next: NextFunction) => {
 	const householdId = req.householdId;
-	const { itemId, name, type, connectedStores } = req.body;
+	const { itemId, name, type, connectedStores: csBody } = req.body;
 
 	if (!householdId) {
 		const error = new Error("Household not found") as any;
@@ -199,64 +187,55 @@ export const updateItem = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	prisma.item
-		.findFirst({ where: { id: itemId, householdId } })
-		.then((item) => {
-			if (!item) {
-				const error = new Error("Item not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
+	try {
+		const item = db.query.items.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, itemId), eq(t.householdId, householdId)),
+		}).sync();
+		if (!item) {
+			const error = new Error("Item not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
 
-			const updateData: any = {};
-			if (name !== undefined) updateData.name = name;
-			if (type !== undefined) updateData.typeId = type;
+		const updateData: any = {};
+		if (name !== undefined) updateData.name = name;
+		if (type !== undefined) updateData.typeId = type;
 
-			if (connectedStores !== undefined) {
-				return prisma.$transaction([
-					prisma.itemConnectedStore.deleteMany({ where: { itemId } }),
-					prisma.item.update({
-						where: { id: itemId },
-						data: {
-							...updateData,
-							connectedStores: {
-								create: (connectedStores as any[]).map((cs: any) => ({
-									storeId: cs.storeId,
-									storeName: cs.storeName,
-									storeItemId: cs.storeItemId || "",
-									storeItemName: cs.storeItemName || "",
-								})),
-							},
-						},
-						include: { connectedStores: true },
-					}),
-				]).then(([, updated]) => updated);
-			}
-
-			return prisma.item.update({
-				where: { id: itemId },
-				data: updateData,
-				include: { connectedStores: true },
+		if (csBody !== undefined) {
+			db.transaction((tx) => {
+				tx.delete(itemConnectedStores).where(eq(itemConnectedStores.itemId, itemId)).run();
+				if (Object.keys(updateData).length > 0) {
+					tx.update(items).set(updateData).where(eq(items.id, itemId)).run();
+				}
+				if ((csBody as any[]).length > 0) {
+					tx.insert(itemConnectedStores).values(
+						(csBody as any[]).map((cs: any) => ({
+							id: createId(),
+							itemId,
+							storeId: cs.storeId,
+							storeName: cs.storeName,
+							storeItemId: cs.storeItemId || "",
+							storeItemName: cs.storeItemName || "",
+						})),
+					).run();
+				}
 			});
-		})
-		.then((updated: any) => {
-			res.status(200).json({
-				message: "Item updated successfully",
-				item: {
-					...toMongoDoc(updated),
-					connectedStores: updated.connectedStores.map((cs: any) => ({
-						storeId: cs.storeId,
-						storeName: cs.storeName,
-						storeItemId: cs.storeItemId,
-						storeItemName: cs.storeItemName,
-					})),
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+		} else if (Object.keys(updateData).length > 0) {
+			db.update(items).set(updateData).where(eq(items.id, itemId)).run();
+		}
+
+		const updated = db.query.items.findFirst({
+			where: (t, { eq }) => eq(t.id, itemId),
+			with: { connectedStores: true },
+		}).sync()!;
+		res.status(200).json({
+			message: "Item updated successfully",
+			item: mapItemResponse(updated),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const deleteItem = (req: Request, res: Response, next: NextFunction) => {
@@ -275,23 +254,21 @@ export const deleteItem = (req: Request, res: Response, next: NextFunction) => {
 		return next(error);
 	}
 
-	prisma.item
-		.findFirst({ where: { id: itemId, householdId } })
-		.then((item) => {
-			if (!item) {
-				const error = new Error("Item not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
-			return prisma.item.delete({ where: { id: itemId } });
-		})
-		.then(() => {
-			res.status(200).json({ message: "Item deleted successfully" });
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
-		});
+	try {
+		const item = db.query.items.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, itemId), eq(t.householdId, householdId)),
+		}).sync();
+		if (!item) {
+			const error = new Error("Item not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+		db.delete(items).where(eq(items.id, itemId)).run();
+		res.status(200).json({ message: "Item deleted successfully" });
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
 
 export const addConnectedStore = (
@@ -316,56 +293,44 @@ export const addConnectedStore = (
 		return next(error);
 	}
 
-	prisma.store
-		.findFirst({ where: { id: storeId, householdId } })
-		.then((store) => {
-			if (!store) {
-				const error = new Error("Store not found") as any;
-				error.statusCode = 404;
-				throw error;
-			}
+	try {
+		const store = db.query.stores.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, storeId), eq(t.householdId, householdId)),
+		}).sync();
+		if (!store) {
+			const error = new Error("Store not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
 
-			return prisma.item
-				.findFirst({ where: { id: itemId, householdId } })
-				.then((item) => {
-					if (!item) {
-						const error = new Error("Item not found") as any;
-						error.statusCode = 404;
-						throw error;
-					}
+		const item = db.query.items.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, itemId), eq(t.householdId, householdId)),
+		}).sync();
+		if (!item) {
+			const error = new Error("Item not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
 
-					return prisma.item.update({
-						where: { id: itemId },
-						data: {
-							connectedStores: {
-								create: {
-									storeId: store.id,
-									storeName: store.name,
-									storeItemId,
-									storeItemName,
-								},
-							},
-						},
-						include: { connectedStores: true },
-					});
-				});
-		})
-		.then((updated) => {
-			res.status(200).json({
-				message: "Store added to item",
-				item: {
-					...toMongoDoc(updated),
-					connectedStores: updated.connectedStores.map((cs) => ({
-						storeId: cs.storeId,
-						storeName: cs.storeName,
-						storeItemId: cs.storeItemId,
-						storeItemName: cs.storeItemName,
-					})),
-				},
-			});
-		})
-		.catch((err: any) => {
-			if (!err.statusCode) err.statusCode = 500;
-			next(err);
+		db.insert(itemConnectedStores).values({
+			id: createId(),
+			itemId,
+			storeId: store.id,
+			storeName: store.name,
+			storeItemId,
+			storeItemName,
+		}).run();
+
+		const updated = db.query.items.findFirst({
+			where: (t, { eq }) => eq(t.id, itemId),
+			with: { connectedStores: true },
+		}).sync()!;
+		res.status(200).json({
+			message: "Store added to item",
+			item: mapItemResponse(updated),
 		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
 };
