@@ -175,6 +175,7 @@ export const meals = sqliteTable("Meal", {
 	start:      integer("start", { mode: "timestamp" }).notNull(),
 	end:        integer("end", { mode: "timestamp" }).notNull(),
 	portion:    real("portion").notNull(),
+	done:       integer("done", { mode: "boolean" }).notNull().default(false),
 });
 
 // ── Shopping ──────────────────────────────────────────────────────────────────

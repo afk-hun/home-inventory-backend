@@ -2,9 +2,10 @@ import { NextFunction, Request, Response } from "express";
 import { eq, and, count } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { db } from "../../lib/db";
-import { shelves, shelfItems } from "../../db/schema";
+import { shelves, shelfItems, meals } from "../../db/schema";
 import { toMongoDoc } from "../../lib/serialize";
 import { toBase } from "../../lib/units";
+
 
 function shelfWithItems(id: string) {
 	return db.query.shelves.findFirst({
@@ -314,6 +315,115 @@ export const removeShelfItem = (
 		res.status(200).json({
 			message: "Item removed from shelf",
 			shelf: mapShelfResponse(updated),
+		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
+};
+
+export const consumeRecipeIngredients = (
+	req: Request,
+	res: Response,
+	next: NextFunction,
+) => {
+	const householdId = req.householdId;
+	const { recipeId, mealId } = req.body;
+
+	if (!householdId) {
+		const error = new Error("Household not found") as any;
+		error.statusCode = 404;
+		return next(error);
+	}
+
+	if (!recipeId || typeof recipeId !== "string") {
+		const error = new Error("Recipe ID is required") as any;
+		error.statusCode = 400;
+		return next(error);
+	}
+
+	if (!mealId || typeof mealId !== "string") {
+		const error = new Error("Meal ID is required") as any;
+		error.statusCode = 400;
+		return next(error);
+	}
+
+	try {
+		const recipe = db.query.recipes.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, recipeId), eq(t.householdId, householdId)),
+			with: { ingredients: true },
+		}).sync();
+
+		if (!recipe) {
+			const error = new Error("Recipe not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+
+		let removedCount = 0;
+		let updatedCount = 0;
+
+		for (const ingredient of recipe.ingredients) {
+			const matchingShelfItems = db
+				.select({
+					id: shelfItems.id,
+					baseQuantity: shelfItems.baseQuantity,
+					baseUnit: shelfItems.baseUnit,
+				})
+				.from(shelfItems)
+				.innerJoin(shelves, eq(shelfItems.shelfId, shelves.id))
+				.where(and(eq(shelves.householdId, householdId), eq(shelfItems.itemId, ingredient.itemId)))
+				.all();
+
+			if (matchingShelfItems.length === 0) continue;
+
+			const ingredientBaseUnit = ingredient.baseUnit;
+			const ingredientBase = ingredient.baseQuantity;
+
+			if (ingredientBase === null || ingredientBaseUnit === null) {
+				// Unit is non-convertible (e.g. "bunch") — remove all matching shelf items
+				for (const si of matchingShelfItems) {
+					db.delete(shelfItems).where(eq(shelfItems.id, si.id)).run();
+					removedCount++;
+				}
+				continue;
+			}
+
+			let remaining = ingredientBase;
+
+			for (const si of matchingShelfItems) {
+				if (remaining <= 0) break;
+
+				if (si.baseQuantity === null || si.baseUnit !== ingredientBaseUnit) {
+					// Incompatible unit category — remove shelf item
+					db.delete(shelfItems).where(eq(shelfItems.id, si.id)).run();
+					removedCount++;
+					continue;
+				}
+
+				const newBase = si.baseQuantity - remaining;
+				if (newBase <= 0) {
+					db.delete(shelfItems).where(eq(shelfItems.id, si.id)).run();
+					removedCount++;
+					remaining -= si.baseQuantity;
+				} else {
+					// Partial deduction — store remainder in base units
+					db.update(shelfItems)
+						.set({ quantity: newBase, unit: si.baseUnit, baseQuantity: newBase })
+						.where(eq(shelfItems.id, si.id))
+						.run();
+					updatedCount++;
+					remaining = 0;
+				}
+			}
+		}
+
+		db.update(meals).set({ done: true }).where(eq(meals.id, mealId)).run();
+
+		res.status(200).json({
+			message: "Recipe ingredients consumed from shelves",
+			removed: removedCount,
+			updated: updatedCount,
 		});
 	} catch (err: any) {
 		if (!err.statusCode) err.statusCode = 500;
