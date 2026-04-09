@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { eq, and, count } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { db } from "../../lib/db";
-import { shelves, shelfItems, meals } from "../../db/schema";
+import { shelves, shelfItems, meals, items, shoppingLists, shoppingListItems } from "../../db/schema";
 import { toMongoDoc } from "../../lib/serialize";
 import { toBase } from "../../lib/units";
 
@@ -203,6 +203,11 @@ export const deleteShelf = (
 		if (!shelf) {
 			const error = new Error("Shelf not found") as any;
 			error.statusCode = 404;
+			return next(error);
+		}
+		if (shelf.type === "shopping-bag") {
+			const error = new Error("The Shopping Bag shelf cannot be deleted") as any;
+			error.statusCode = 403;
 			return next(error);
 		}
 		db.delete(shelves).where(eq(shelves.id, shelfId)).run();
@@ -424,6 +429,99 @@ export const consumeRecipeIngredients = (
 			message: "Recipe ingredients consumed from shelves",
 			removed: removedCount,
 			updated: updatedCount,
+		});
+	} catch (err: any) {
+		if (!err.statusCode) err.statusCode = 500;
+		next(err);
+	}
+};
+
+export const addCheckedToShoppingBag = (
+	req: Request,
+	res: Response,
+	next: NextFunction,
+) => {
+	const householdId = req.householdId;
+	const { shoppingListId } = req.body;
+
+	if (!householdId) {
+		const error = new Error("Household not found") as any;
+		error.statusCode = 404;
+		return next(error);
+	}
+
+	if (!shoppingListId || typeof shoppingListId !== "string") {
+		const error = new Error("Shopping list ID is required") as any;
+		error.statusCode = 400;
+		return next(error);
+	}
+
+	try {
+		const list = db.query.shoppingLists.findFirst({
+			where: (t, { and, eq }) => and(eq(t.id, shoppingListId), eq(t.householdId, householdId)),
+			with: { items: true },
+		}).sync();
+
+		if (!list) {
+			const error = new Error("Shopping list not found") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+
+		const checkedItems = list.items.filter((i) => i.checked);
+
+		if (checkedItems.length === 0) {
+			res.status(200).json({ message: "No checked items to move", movedCount: 0 });
+			return;
+		}
+
+		const bag = db.query.shelves.findFirst({
+			where: (t, { and, eq }) => and(eq(t.householdId, householdId), eq(t.type, "shopping-bag")),
+		}).sync();
+
+		if (!bag) {
+			const error = new Error("Shopping Bag shelf not found for this household") as any;
+			error.statusCode = 404;
+			return next(error);
+		}
+
+		// Load all existing items for name lookup
+		const householdItems = db
+			.select({ id: items.id, name: items.name })
+			.from(items)
+			.where(eq(items.householdId, householdId))
+			.all();
+
+		for (const checkedItem of checkedItems) {
+			const lowerName = checkedItem.itemName.toLowerCase();
+			let existingItem = householdItems.find((i) => i.name.toLowerCase() === lowerName);
+
+			if (!existingItem) {
+				const newItemId = createId();
+				db.insert(items).values({ id: newItemId, name: checkedItem.itemName, householdId }).run();
+				existingItem = { id: newItemId, name: checkedItem.itemName };
+				householdItems.push(existingItem);
+			}
+
+			const { baseQuantity, baseUnit } = toBase(checkedItem.quantity, checkedItem.unit);
+
+			db.insert(shelfItems).values({
+				id: createId(),
+				shelfId: bag.id,
+				itemId: existingItem.id,
+				itemName: checkedItem.itemName,
+				quantity: checkedItem.quantity,
+				unit: checkedItem.unit,
+				...(baseQuantity !== null && { baseQuantity }),
+				...(baseUnit !== null && { baseUnit }),
+			}).run();
+
+			db.delete(shoppingListItems).where(eq(shoppingListItems.id, checkedItem.id)).run();
+		}
+
+		res.status(200).json({
+			message: "Checked items moved to Shopping Bag",
+			movedCount: checkedItems.length,
 		});
 	} catch (err: any) {
 		if (!err.statusCode) err.statusCode = 500;

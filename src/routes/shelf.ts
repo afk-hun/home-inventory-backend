@@ -5,7 +5,7 @@ import { getShelfPlaceTypes, createShelfPlaceType, renameShelfPlaceType, deleteS
 import { getShelfTypes, createShelfType, renameShelfType, deleteShelfType } from "../controller/shelf/type";
 import { getItemTypes, createItemType, renameItemType, deleteItemType } from "../controller/shelf/itemType";
 import { getItem, getItems, createItem, updateItem, deleteItem, addConnectedStore } from "../controller/shelf/item";
-import { getShelves, getShelf, createShelf, updateShelf, deleteShelf, addShelfItem, removeShelfItem, consumeRecipeIngredients } from "../controller/shelf/shelf";
+import { getShelves, getShelf, createShelf, updateShelf, deleteShelf, addShelfItem, removeShelfItem, consumeRecipeIngredients, addCheckedToShoppingBag } from "../controller/shelf/shelf";
 
 const router = Router();
 
@@ -36,6 +36,7 @@ router.delete("/item", isAuth, validateCsrf, deleteItem);
 router.post("/shelf/add-item", isAuth, validateCsrf, addShelfItem);
 router.delete("/shelf/remove-item", isAuth, validateCsrf, removeShelfItem);
 router.post("/shelf/consume-recipe", isAuth, validateCsrf, consumeRecipeIngredients);
+router.post("/shelf/add-to-bag", isAuth, validateCsrf, addCheckedToShoppingBag);
 
 router.get("/shelf/:id", isAuth, validateCsrf, getShelf);
 router.get("/shelf", isAuth, validateCsrf, getShelves);

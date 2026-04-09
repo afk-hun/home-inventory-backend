@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { eq } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { db } from "../lib/db";
-import { households, householdMembers } from "../db/schema";
+import { households, householdMembers, shelves } from "../db/schema";
 import { setHouseholdCookie } from "./auth";
 
 export const setHousehold = (
@@ -72,6 +72,7 @@ export const createHousehold = (
 		const householdId = createId();
 		db.insert(households).values({ id: householdId, name, ownerId: owner.id }).run();
 		db.insert(householdMembers).values({ householdId, userId: owner.id }).run();
+		db.insert(shelves).values({ id: createId(), householdId, name: "Shopping Bag", type: "shopping-bag" }).run();
 		res.status(201).json({
 			message: "Household created!",
 			household: {

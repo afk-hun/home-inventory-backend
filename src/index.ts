@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import app from "./app";
+import { seedShoppingBags } from "./lib/seedShoppingBag";
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -14,5 +15,6 @@ if (!JWT_SECRET || typeof JWT_SECRET !== "string") {
 	process.exit(1);
 }
 
+seedShoppingBags();
 console.log(`Server running on port ${port}`);
 app.listen(port);
