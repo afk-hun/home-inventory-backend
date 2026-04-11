@@ -45,7 +45,7 @@ export const getItems = (req: Request, res: Response, next: NextFunction) => {
 			// Need to fetch all and filter in memory (OR queries on relations need subqueries)
 			const allItems = db.query.items.findMany({
 				where: (t, { eq }) => eq(t.householdId, householdId),
-				with: { connectedStores: true },
+				with: { type: { columns: { id: true, name: true } }, connectedStores: true },
 			}).sync();
 			const filtered = allItems.filter(
 				(item) => item.connectedStores.length === 0 || item.connectedStores.some((cs) => cs.storeId === storeId),
@@ -60,7 +60,7 @@ export const getItems = (req: Request, res: Response, next: NextFunction) => {
 			const [{ total }] = db.select({ total: count() }).from(items).where(eq(items.householdId, householdId)).all();
 			const result = db.query.items.findMany({
 				where: (t, { eq }) => eq(t.householdId, householdId),
-				with: { connectedStores: true },
+				with: { type: { columns: { id: true, name: true } }, connectedStores: true },
 				limit,
 				offset: skip,
 			}).sync();
@@ -159,7 +159,7 @@ export const createItem = (req: Request, res: Response, next: NextFunction) => {
 		}
 		const result = db.query.items.findFirst({
 			where: (t, { eq }) => eq(t.id, id),
-			with: { connectedStores: true },
+			with: { type: { columns: { id: true, name: true } }, connectedStores: true },
 		}).sync()!;
 		res.status(201).json({
 			message: "Item created!",
@@ -226,7 +226,7 @@ export const updateItem = (req: Request, res: Response, next: NextFunction) => {
 
 		const updated = db.query.items.findFirst({
 			where: (t, { eq }) => eq(t.id, itemId),
-			with: { connectedStores: true },
+			with: { type: { columns: { id: true, name: true } }, connectedStores: true },
 		}).sync()!;
 		res.status(200).json({
 			message: "Item updated successfully",
@@ -323,7 +323,7 @@ export const addConnectedStore = (
 
 		const updated = db.query.items.findFirst({
 			where: (t, { eq }) => eq(t.id, itemId),
-			with: { connectedStores: true },
+			with: { type: { columns: { id: true, name: true } }, connectedStores: true },
 		}).sync()!;
 		res.status(200).json({
 			message: "Store added to item",
