@@ -81,7 +81,7 @@ const setUserCookie = (res: Response, userId: string) => {
 		httpOnly: false,
 		secure: process.env.NODE_ENV === "production",
 		sameSite: "lax",
-		maxAge: CSRF_MAX_AGE_MS,
+		maxAge: REFRESH_TOKEN_MAX_AGE_MS,
 	});
 };
 
@@ -90,7 +90,7 @@ export const setHouseholdCookie = (res: Response, householdId: string) => {
 		httpOnly: false,
 		secure: process.env.NODE_ENV === "production",
 		sameSite: "lax",
-		maxAge: CSRF_MAX_AGE_MS,
+		maxAge: REFRESH_TOKEN_MAX_AGE_MS,
 	});
 };
 
