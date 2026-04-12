@@ -195,6 +195,7 @@ export const shoppingListItems = sqliteTable("ShoppingListItem", {
 	baseQuantity:   real("baseQuantity"),
 	baseUnit:       text("baseUnit"),
 	checked:        integer("checked", { mode: "boolean" }).notNull().default(false),
+	discount:       integer("discount", { mode: "boolean" }).notNull().default(false),
 });
 
 // ── Relations ─────────────────────────────────────────────────────────────────

@@ -1,0 +1,1 @@
+ALTER TABLE `ShoppingListItem` ADD `discount` integer DEFAULT false NOT NULL;

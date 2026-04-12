@@ -12,6 +12,7 @@ function mapListItems(items: any[]) {
 		quantity: item.quantity,
 		unit: item.unit,
 		checked: item.checked,
+		discount: item.discount ?? false,
 	}));
 }
 
@@ -136,6 +137,7 @@ export const createShoppingList = (
 						quantity: item.quantity,
 						unit: item.unit,
 						checked: item.checked ?? false,
+						discount: item.discount ?? false,
 						...(baseQuantity !== null && { baseQuantity }),
 						...(baseUnit !== null && { baseUnit }),
 					};
@@ -210,6 +212,7 @@ export const updateShoppingList = (
 								quantity: item.quantity,
 								unit: item.unit,
 								checked: item.checked ?? false,
+								discount: item.discount ?? false,
 								...(baseQuantity !== null && { baseQuantity }),
 								...(baseUnit !== null && { baseUnit }),
 							};
