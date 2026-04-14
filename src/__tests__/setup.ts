@@ -13,6 +13,7 @@ import {
 	shelfItems,
 	shelves,
 	itemConnectedStores,
+	userFavoriteItems,
 	items,
 	itemTypes,
 	shelfTypes,
@@ -47,6 +48,7 @@ afterEach(() => {
 	db.delete(shelfItems).run();
 	db.delete(shelves).run();
 	db.delete(itemConnectedStores).run();
+	db.delete(userFavoriteItems).run();
 	db.delete(items).run();
 	db.delete(itemTypes).run();
 	db.delete(shelfTypes).run();

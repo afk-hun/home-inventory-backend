@@ -6,6 +6,7 @@ import { getShelfTypes, createShelfType, renameShelfType, deleteShelfType } from
 import { getItemTypes, createItemType, renameItemType, deleteItemType } from "../controller/shelf/itemType";
 import { getItem, getItems, createItem, updateItem, deleteItem, addConnectedStore } from "../controller/shelf/item";
 import { getShelves, getShelf, createShelf, updateShelf, deleteShelf, addShelfItem, removeShelfItem, consumeRecipeIngredients, addCheckedToShoppingBag } from "../controller/shelf/shelf";
+import { addFavoriteItem, getFavoriteItems, removeFavoriteItem, removeOneFavoriteItem } from "../controller/shelf/favorite";
 
 const router = Router();
 
@@ -26,6 +27,10 @@ router.post("/item-type", isAuth, validateCsrf, createItemType);
 router.patch("/item-type", isAuth, validateCsrf, renameItemType);
 router.delete("/item-type", isAuth, validateCsrf, deleteItemType);
 
+router.get("/item/favorite", isAuth, validateCsrf, getFavoriteItems);
+router.post("/item/favorite", isAuth, validateCsrf, addFavoriteItem);
+router.delete("/item/favorite", isAuth, validateCsrf, removeFavoriteItem);
+router.post("/item/favorite/remove-one", isAuth, validateCsrf, removeOneFavoriteItem);
 router.get("/item/:id", isAuth, validateCsrf, getItem);
 router.get("/item", isAuth, validateCsrf, getItems);
 router.post("/item/add-store", isAuth, validateCsrf, addConnectedStore);

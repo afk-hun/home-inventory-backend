@@ -4,8 +4,9 @@ import { createId } from "@paralleldrive/cuid2";
 import { db } from "../../lib/db";
 import { items, itemConnectedStores } from "../../db/schema";
 import { toMongoDoc } from "../../lib/serialize";
+import { getFavoriteItemIdSet } from "./favorite";
 
-function mapItemResponse(item: any) {
+function mapItemResponse(item: any, favoriteItemIds?: Set<string>) {
 	return {
 		...toMongoDoc(item),
 		type: item.type ? { _id: item.type.id, name: item.type.name } : null,
@@ -15,6 +16,7 @@ function mapItemResponse(item: any) {
 			storeItemId: cs.storeItemId,
 			storeItemName: cs.storeItemName,
 		})),
+		isFavorite: favoriteItemIds?.has(item.id) ?? false,
 	};
 }
 
@@ -38,6 +40,7 @@ export const getItems = (req: Request, res: Response, next: NextFunction) => {
 	}
 
 	const storeId = req.query.storeId as string | undefined;
+	const favoriteItemIds = getFavoriteItemIdSet(user.id, householdId);
 
 	try {
 		if (storeId) {
@@ -53,7 +56,7 @@ export const getItems = (req: Request, res: Response, next: NextFunction) => {
 			const total = filtered.length;
 			const page_items = filtered.slice(skip, skip + limit);
 			res.status(200).json({
-				items: page_items.map(mapItemResponse),
+				items: page_items.map((item) => mapItemResponse(item, favoriteItemIds)),
 				pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
 			});
 		} else {
@@ -65,7 +68,7 @@ export const getItems = (req: Request, res: Response, next: NextFunction) => {
 				offset: skip,
 			}).sync();
 			res.status(200).json({
-				items: result.map(mapItemResponse),
+				items: result.map((item) => mapItemResponse(item, favoriteItemIds)),
 				pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
 			});
 		}
@@ -93,6 +96,7 @@ export const getItem = (req: Request, res: Response, next: NextFunction) => {
 	}
 
 	try {
+		const favoriteItemIds = getFavoriteItemIdSet(user.id, householdId);
 		const item = db.query.items.findFirst({
 			where: (t, { and, eq }) => and(eq(t.id, id), eq(t.householdId, householdId)),
 			with: {
@@ -105,7 +109,7 @@ export const getItem = (req: Request, res: Response, next: NextFunction) => {
 			error.statusCode = 404;
 			return next(error);
 		}
-		res.status(200).json({ item: mapItemResponse(item) });
+		res.status(200).json({ item: mapItemResponse(item, favoriteItemIds) });
 	} catch (err: any) {
 		if (!err.statusCode) err.statusCode = 500;
 		next(err);
@@ -228,9 +232,12 @@ export const updateItem = (req: Request, res: Response, next: NextFunction) => {
 			where: (t, { eq }) => eq(t.id, itemId),
 			with: { type: { columns: { id: true, name: true } }, connectedStores: true },
 		}).sync()!;
+		const favoriteItemIds = req.user && householdId
+			? getFavoriteItemIdSet(req.user.id, householdId)
+			: undefined;
 		res.status(200).json({
 			message: "Item updated successfully",
-			item: mapItemResponse(updated),
+			item: mapItemResponse(updated, favoriteItemIds),
 		});
 	} catch (err: any) {
 		if (!err.statusCode) err.statusCode = 500;

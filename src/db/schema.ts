@@ -82,6 +82,12 @@ export const itemConnectedStores = sqliteTable("ItemConnectedStore", {
 	storeItemName: text("storeItemName").notNull().default(""),
 });
 
+export const userFavoriteItems = sqliteTable("UserFavoriteItem", {
+	userId:      text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+	itemId:      text("itemId").notNull().references(() => items.id, { onDelete: "cascade" }),
+	householdId: text("householdId").notNull().references(() => households.id, { onDelete: "cascade" }),
+}, (t) => [primaryKey({ columns: [t.userId, t.itemId] })]);
+
 // ── Shelves ───────────────────────────────────────────────────────────────────
 export const shelves = sqliteTable("Shelf", {
 	id:          text("id").primaryKey(),
@@ -202,6 +208,7 @@ export const shoppingListItems = sqliteTable("ShoppingListItem", {
 export const usersRelations = relations(users, ({ many }) => ({
 	ownedHouseholds:  many(households),
 	memberHouseholds: many(householdMembers),
+	favoriteItems:    many(userFavoriteItems),
 }));
 
 export const householdsRelations = relations(households, ({ one, many }) => ({
@@ -215,6 +222,7 @@ export const householdsRelations = relations(households, ({ one, many }) => ({
 	recipes:         many(recipes),
 	schedules:       many(monthlyCookingSchedules),
 	shoppingLists:   many(shoppingLists),
+	favoriteItems:   many(userFavoriteItems),
 	itemTypes:       many(itemTypes),
 	shelfTypes:      many(shelfTypes),
 	shelfPlaceTypes: many(shelfPlaceTypes),
@@ -239,6 +247,13 @@ export const itemsRelations = relations(items, ({ one, many }) => ({
 	connectedStores: many(itemConnectedStores),
 	shelfItems:      many(shelfItems),
 	ingredients:     many(ingredients),
+	favoriteUsers:   many(userFavoriteItems),
+}));
+
+export const userFavoriteItemsRelations = relations(userFavoriteItems, ({ one }) => ({
+	user:      one(users,      { fields: [userFavoriteItems.userId],      references: [users.id] }),
+	item:      one(items,      { fields: [userFavoriteItems.itemId],      references: [items.id] }),
+	household: one(households, { fields: [userFavoriteItems.householdId], references: [households.id] }),
 }));
 
 export const itemConnectedStoresRelations = relations(itemConnectedStores, ({ one }) => ({
