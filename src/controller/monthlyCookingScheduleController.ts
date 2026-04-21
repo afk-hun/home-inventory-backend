@@ -13,6 +13,7 @@ function mapMeals(ms: any[]) {
 		mealType: m.mealType,
 		recipe: m.recipeId,
 		portion: m.portion,
+		done: m.done,
 	}));
 }
 
@@ -151,6 +152,7 @@ export const createSchedule = (
 					start: new Date(m.start),
 					end: new Date(m.end),
 					portion: m.portion,
+					done: m.done ?? false,
 				})),
 			).run();
 		}
@@ -219,6 +221,7 @@ export const updateSchedule = (
 							start: new Date(m.start),
 							end: new Date(m.end),
 							portion: m.portion,
+							done: m.done ?? false,
 						})),
 					).run();
 				}
